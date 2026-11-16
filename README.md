@@ -31,16 +31,16 @@ Sets up Claude Code (DPS MCP; plugin work follows RuneLite's official `AGENTS.md
 
 ## 1. MCP server (works now, Node 20+)
 
-`mcp-server/dist/index.js` is a self-contained bundle (engine + item/monster data); no `npm install` needed.
+`app/dist/index.js` is a self-contained bundle (engine + item/monster data); no `npm install` needed.
 
 **Claude Code:**
 ```bash
-claude mcp add osrs-dps -- node /ABSOLUTE/PATH/osrs-dps-mcp/mcp-server/dist/index.js
+claude mcp add osrs-dps -- node /ABSOLUTE/PATH/osrs-dps-mcp/app/dist/index.js
 ```
 
 **Claude Desktop** (`claude_desktop_config.json`):
 ```json
-{ "mcpServers": { "osrs-dps": { "command": "node", "args": ["C:\\path\\osrs-dps-mcp\\mcp-server\\dist\\index.js"] } } }
+{ "mcpServers": { "osrs-dps": { "command": "node", "args": ["C:\\path\\osrs-dps-mcp\\app\\dist\\index.js"] } } }
 ```
 
 ### Zero-Java quick start: WikiSync fallback
@@ -51,7 +51,7 @@ Install **WikiSync** from the RuneLite Plugin Hub. The MCP reads your gear + bas
 Adds what WikiSync lacks: **boosted levels (potions auto-detected), active prayers, attack style, current target, slayer task**. Read-only: it writes a JSON file on change, never sends input.
 
 ```bash
-cd runelite-plugin
+cd plugin
 ./gradlew run          # Windows: gradlew.bat run   (JDK 11+ required)
 ```
 This launches a developer RuneLite client with the plugin loaded. Enable **DPS Bridge** in the plugin list.
@@ -64,7 +64,7 @@ This launches a developer RuneLite client with the plugin loaded. Enable **DPS B
 
 New items/bosses come from the Wiki calc repo:
 ```bash
-cd mcp-server
+cd app
 npm install
 npm run setup           # clones engine at the pinned commit into ../vendor
 npm run update-calc     # or: pull latest engine + data and rebuild
@@ -73,7 +73,7 @@ npm test                # offline self-tests
 
 ## Building with Claude Code
 
-`runelite-plugin/AGENTS.md` is RuneLite's official agent guide (copied from `runelite/example-plugin`, with `CLAUDE.md` importing it). Claude Code loads it automatically, so plugin changes follow Plugin Hub rules: Java 11, Filepath for file I/O, no input injection, combat restrictions.
+`plugin/AGENTS.md` is RuneLite's official agent guide (copied from `runelite/example-plugin`, with `CLAUDE.md` importing it). Claude Code loads it automatically, so plugin changes follow Plugin Hub rules: Java 11, Filepath for file I/O, no input injection, combat restrictions.
 
 ## Limits (v0.1)
 
@@ -88,13 +88,13 @@ The calculator engine is GPL-3.0 (weirdgloop/osrs-dps-calc), so the bundled `dis
 
 ## Quality checks (built with the `mcp-builder` skill)
 
-| Check | Command (in `mcp-server/`) |
+| Check | Command (in `app/`) |
 |---|---|
 | MCP smoke test (all 4 tools, errors, pagination), uses the prebuilt `dist/` | `npm install && npm run smoke` |
 | Rebuild from source + all tests | `npm run setup && npm test` |
 | Strict type-check of our code | `npx tsc -p .` (errors listed under `../vendor/` are the Wiki calc's own, unchanged) |
 | Interactive explorer | `npx @modelcontextprotocol/inspector node dist/index.js` |
-| LLM evaluation (10 questions, needs `ANTHROPIC_API_KEY`) | `cd ../evals && pip install -r requirements.txt && python evaluation.py evaluation.xml -t stdio -c node -a ../mcp-server/dist/index.js -e DPS_BRIDGE_FILE=../examples/state.sample.json` |
+| LLM evaluation (10 questions, needs `ANTHROPIC_API_KEY`) | `cd ../evals && pip install -r requirements.txt && python evaluation.py evaluation.xml -t stdio -c node -a ../app/dist/index.js -e DPS_BRIDGE_FILE=../examples/state.sample.json` |
 
 ## Legality gate (don't get banned)
 
@@ -103,7 +103,7 @@ Two layers, because legality is about what a feature *does*, and code patterns o
 | Layer | When | What |
 |---|---|---|
 | `osrs-legality-gate` skill | Before any new/changed feature | GREEN / AMBER / RED verdict against RuneLite's official rules + Plugin Hub precedent |
-| `runelite-plugin/tools/legal-lint.mjs` | After every edit (Claude Code hook) or `node tools/legal-lint.mjs` | RED: forbidden code (input injection, menu actions, autotype, reflection, servers…) blocks the edit. AMBER: risky APIs (projectiles, prayer tab, NPC targeting, sounds…) need a `// legal-gate: GREEN <reason>` line |
+| `plugin/tools/legal-lint.mjs` | After every edit (Claude Code hook, with Claude Code opened at the repo root) or `node tools/legal-lint.mjs` in `plugin/` | RED: forbidden code (input injection, menu actions, autotype, reflection, servers…) blocks the edit. AMBER: risky APIs (projectiles, prayer tab, NPC targeting, sounds…) need a `// legal-gate: GREEN <reason>` line |
 
 No tool guarantees anything: the Plugin Hub review is the strongest check there is. If a feature wouldn't pass it, don't run it locally either.
 
@@ -111,6 +111,6 @@ No tool guarantees anything: the Plugin Hub review is the strongest check there 
 
 - Nothing here asks for, reads or stores your password. The MCP makes no internet requests; it reads a local file (or WikiSync on localhost). The plugin writes gear/levels/prayers/target only.
 - Dev client login goes through Jagex's own login window; the session is kept in Windows Credential Manager / macOS Keychain, not in a file.
-- If you ever created `~/.runelite/credentials.properties` (old method), delete it. Claude Code is blocked from reading it in `runelite-plugin/.claude/settings.json`.
+- If you ever created `~/.runelite/credentials.properties` (old method), delete it. Claude Code is blocked from reading it in the repo-root `.claude/settings.json`.
 - `install.mjs` installs no third-party skills or MCP servers. Don't add other people's MCP servers, skills or "RuneLite" downloads without reading them: they run with your user's permissions.
 - Turn on 2-step authentication on your Jagex account.
