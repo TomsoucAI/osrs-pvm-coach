@@ -1,6 +1,6 @@
 // Test oracle for planBankMode: a brute-force search with no pruning.
 // It tries every owned item (and the empty slot) in every slot, with every weapon, combat style and spell,
-// and keeps the best setup per weapon. It shares no search code with bankMode.ts: only the engine and calc.ts.
+// and keeps the 3 best DPS values over all setups. It shares no search code with bankMode.ts: only the engine and calc.ts.
 import PlayerVsNPCCalc from '@/lib/PlayerVsNPCCalc';
 import {
   calculateAttackSpeed, calculateEquipmentBonusesFromGear, equipmentAliases, getCanonicalItem,
@@ -55,7 +55,8 @@ export function exhaustiveSearch(
   const empty = Object.fromEntries(SLOTS.map((s) => [s, null])) as Record<Slot, null>;
   const template = buildPlayer(state, monster, { equipment: empty }).player;
   const otherSlots = SLOTS.filter((s) => s !== 'weapon');
-  const best = new Map<EquipmentPiece | null, OracleSetup>();
+  // One entry per DPS value as shown (3 decimals): the setup with the fewest swaps.
+  const best = new Map<number, OracleSetup>();
 
   // Same speed-up as bankMode.ts: every piece is already the base variant, so the engine's alias scan finds nothing.
   const savedAliases = Object.entries(equipmentAliases);
@@ -85,15 +86,14 @@ export function exhaustiveSearch(
             player.attackSpeed = calculateAttackSpeed(player, monster);
             const calc = new PlayerVsNPCCalc(player, monster, { loadoutName: 'oracle' });
             if (calc.userIssues.some((issue) => ISSUES_THAT_BLOCK.includes(issue.type))) return;
-            // Raw DPS decides, as in bankMode.ts. It is rounded only in the returned list.
-            const dps = calc.getDps();
-            if (dps <= 0) return;
+            if (calc.getDps() <= 0) return;
+            const dps = round3(calc.getDps());
             const swaps = SLOTS.filter((s) => (equipment[s]?.id ?? null) !== (worn[s]?.id ?? null)).length;
-            const known = best.get(weapon);
-            if (known && dps === known.dps && swaps === known.swaps) {
+            const known = best.get(dps);
+            if (known && swaps === known.swaps) {
               known.ties++;
-            } else if (!known || dps > known.dps || (dps === known.dps && swaps < known.swaps)) {
-              best.set(weapon, {
+            } else if (!known || swaps < known.swaps) {
+              best.set(dps, {
                 weapon: weapon?.name ?? null,
                 dps,
                 swaps,
@@ -109,5 +109,5 @@ export function exhaustiveSearch(
   } finally {
     for (const [base, variants] of savedAliases) equipmentAliases[Number(base)] = variants;
   }
-  return [...best.values()].sort((a, b) => b.dps - a.dps).slice(0, 3).map((s) => ({ ...s, dps: round3(s.dps) }));
+  return [...best.values()].sort((a, b) => b.dps - a.dps).slice(0, 3);
 }

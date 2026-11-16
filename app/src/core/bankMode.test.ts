@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { equipmentAliases } from '@/lib/Equipment';
 import { scanEngineNamedItems } from '../../scripts/engine-named-items';
-import { SLOTS } from '../calc';
+import { findItem, SLOTS } from '../calc';
 import referenceDps from '../../fixtures/ironman-v2/reference-dps.json';
 import {
   planBankMode, type CombatStyle, type Setup, type StylePlan,
@@ -47,14 +47,28 @@ test('every recommended item is owned and carries its source', async () => {
   }
 });
 
-test('setups are ranked by DPS, one per weapon', async () => {
+test('a style gives its 3 best setups overall, ranked by DPS, each with a different DPS', async () => {
   const plan = planBankMode(await load('ironman-v2'), { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee' });
 
   const setups = setupsOf(plan.styles.melee);
   assert.deepEqual(Object.keys(plan.styles), ['melee']);
+  assert.equal(setups.length, 3);
   assert.deepEqual(setups.map((s) => s.dps), [...setups.map((s) => s.dps)].sort((a, b) => b - a));
-  assert.equal(new Set(setups.map((s) => s.items.weapon?.name)).size, setups.length);
+  assert.equal(new Set(setups.map((s) => s.dps)).size, 3);
 });
+
+/** The state with one owned weapon only (plus the worn one). */
+function withOnlyWeapon(state: LiveState, name: string): LiveState {
+  const keep = (i: { id: number }) => {
+    const item = findItem(i.id);
+    return item?.slot !== 'weapon' || item.name === name;
+  };
+  return {
+    ...state,
+    inventory: state.inventory.filter(keep),
+    bank: state.bank && { ...state.bank, items: state.bank.items.filter(keep) },
+  };
+}
 
 test('Maggot King Far: melee is unavailable, ranged and magic are ranked', async () => {
   const plan = planBankMode(await load('ironman-v2'), { monster: { name: 'Maggot King', version: 'Far' } });
@@ -65,19 +79,29 @@ test('Maggot King Far: melee is unavailable, ranged and magic are ranked', async
 });
 
 test('a two-handed weapon leaves the shield slot empty', async () => {
-  const plan = planBankMode(await load('ironman-v2'), { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged' });
+  const state = withOnlyWeapon(await load('ironman-v2'), 'Magic shortbow (i)');
+  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged' });
 
-  const shortbow = setupsOf(plan.styles.ranged).find((s) => s.items.weapon?.name === 'Magic shortbow (i)');
-  assert.ok(shortbow, 'the fixture owns a Magic shortbow (i)');
-  assert.equal(shortbow.items.shield, null);
+  const setups = setupsOf(plan.styles.ranged);
+  assert.ok(setups.length > 0);
+  for (const setup of setups) {
+    assert.equal(setup.items.weapon?.name, 'Magic shortbow (i)');
+    assert.equal(setup.items.shield, null);
+  }
 });
 
 test('ammo fits the weapon: bolts with the crossbow, arrows with the bow', async () => {
-  const plan = planBankMode(await load('ironman-v2'), { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged' });
+  const state = await load('ironman-v2');
+  const request = { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged' } as const;
 
-  const byWeapon = Object.fromEntries(setupsOf(plan.styles.ranged).map((s) => [s.items.weapon?.name, s.items.ammo?.name]));
-  assert.match(byWeapon['Rune crossbow'] ?? '', /bolts/);
-  assert.match(byWeapon['Magic shortbow (i)'] ?? '', /arrow/);
+  for (const [weapon, ammo] of [['Rune crossbow', /bolts/], ['Magic shortbow (i)', /arrow/]] as const) {
+    const setups = setupsOf(planBankMode(withOnlyWeapon(state, weapon), request).styles.ranged);
+    assert.ok(setups.length > 0, `${weapon}: setups`);
+    for (const setup of setups) {
+      assert.equal(setup.items.weapon?.name, weapon);
+      assert.match(setup.items.ammo?.name ?? '', ammo);
+    }
+  }
 });
 
 test('magic uses a spell on the current spellbook, and fire against the fire weakness', async () => {
@@ -109,12 +133,14 @@ test('2 Dragon warhammer hits raise the DPS of each melee weapon', async () => {
   const state = await load('ironman-v2');
   const request = { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee' } as const;
 
-  const plain = setupsOf(planBankMode(state, request).styles.melee);
-  const drained = setupsOf(planBankMode(state, { ...request, drains: { dwhHits: 2 } }).styles.melee);
-
-  for (const before of plain) {
-    const after = drained.find((s) => s.items.weapon?.name === before.items.weapon?.name);
-    assert.ok(after && after.dps > before.dps, `${before.items.weapon?.name}: ${after?.dps} should be above ${before.dps}`);
+  for (const weapon of ['Abyssal whip', 'Dragon warhammer']) {
+    // The fixture wears the whip: take it off for the other weapon.
+    const worn = weapon === 'Abyssal whip' ? state : { ...state, equipment: { ...state.equipment, weapon: null } };
+    const only = withOnlyWeapon(worn, weapon);
+    const before = setupsOf(planBankMode(only, request).styles.melee)[0];
+    const after = setupsOf(planBankMode(only, { ...request, drains: { dwhHits: 2 } }).styles.melee)[0];
+    assert.equal(before.items.weapon?.name, weapon);
+    assert.ok(after.dps > before.dps, `${weapon}: ${after.dps} should be above ${before.dps}`);
   }
 });
 
@@ -190,8 +216,7 @@ for (const version of ['Far', 'Nearby']) {
       const expected = exhaustiveSearch(state, { name: 'Maggot King', version }, combat);
       const actual = setupsOf(planBankMode(state, { monster: { name: 'Maggot King', version }, style: combat }).styles[combat]);
 
-      assert.ok(expected.length > 0, 'the oracle found setups');
-      assert.deepEqual(
+      assert.ok(expected.length > 0, 'the oracle found setups');      assert.deepEqual(
         actual.map((s) => ({ weapon: s.items.weapon?.name ?? null, dps: s.dps, swaps: s.swaps.length })),
         expected.map((s) => ({ weapon: s.weapon, dps: s.dps, swaps: s.swaps })),
       );

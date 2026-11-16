@@ -331087,8 +331087,7 @@ function combatStyleOf(style) {
   return style.type === null ? null : "melee";
 }
 function spellCandidates(spellbook) {
-  const usable = spells.filter((s) => s.spellbook === spellbook && s.max_hit > 0);
-  return usable.filter((s) => !s.element || !usable.some((o) => o.element === s.element && o.max_hit > s.max_hit));
+  return spells.filter((s) => s.spellbook === spellbook && s.max_hit > 0).sort((a, b) => b.max_hit - a.max_hit);
 }
 function attacksFor(combat, weapons, spellbook) {
   const castable = spellCandidates(spellbook);
@@ -331155,16 +331154,54 @@ function slotItems(slot, attack, owned, worn) {
     named: owned.filter((o) => ENGINE_NAMED.has(o.canon.name))
   };
 }
-function paretoFront(items, style, worn) {
+function distinctByStats(items, style, worn) {
   const rank = (o) => o === worn ? -2 : o?.canon.id ?? -1;
-  return items.filter((p) => {
-    const [pa, ps] = styleStats(p, style);
-    return !items.some((q) => {
-      if (q === p) return false;
-      const [qa, qs] = styleStats(q, style);
-      return qa >= pa && qs >= ps && (qa > pa || qs > ps || rank(q) < rank(p));
-    });
-  });
+  const byStats = /* @__PURE__ */ new Map();
+  for (const item of items) {
+    const key = styleStats(item, style).join("|");
+    const known = byStats.get(key);
+    if (!byStats.has(key) || rank(item) < rank(known)) byStats.set(key, item);
+  }
+  const total = (o) => styleStats(o, style)[0] + styleStats(o, style)[1];
+  return [...byStats.values()].sort((a, b) => total(b) - total(a));
+}
+function upperBoundItem(slot, options, style) {
+  const stats = options.map((o) => styleStats(o, style));
+  const accuracy = Math.max(...stats.map(([a]) => a));
+  const strength = Math.max(...stats.map(([, s]) => s));
+  const zero2 = {
+    stab: 0,
+    slash: 0,
+    crush: 0,
+    magic: 0,
+    ranged: 0
+  };
+  const canon = {
+    name: "",
+    id: -1,
+    version: "",
+    slot,
+    image: "",
+    weight: 0,
+    speed: 0,
+    category: "" /* NONE */,
+    isTwoHanded: false,
+    offensive: { ...zero2, [style.type]: accuracy },
+    defensive: { ...zero2 },
+    bonuses: {
+      str: 0,
+      ranged_str: 0,
+      magic_str: 0,
+      prayer: 0,
+      [style.type === "magic" ? "magic_str" : style.type === "ranged" ? "ranged_str" : "str"]: strength
+    }
+  };
+  return {
+    ownedId: -1,
+    item: canon,
+    canon,
+    source: "bank"
+  };
 }
 var MAX_SET_PROBES = 64;
 function effectiveNamed(template, attack, slots, monster) {
@@ -331203,58 +331240,76 @@ function effectiveNamed(template, attack, slots, monster) {
   return kept;
 }
 var countSwaps = (gear, worn) => SLOTS.filter((s) => gear[s] !== worn[s]).length;
-var beats = (dps, swaps, other) => !other || dps > other.dps || dps === other.dps && swaps < other.swaps;
-function bestForAttack(template, attack, pool, worn, monster) {
+var round3 = (n) => Math.round(n * 1e3) / 1e3;
+var TopSetups = class {
+  byDps = /* @__PURE__ */ new Map();
+  /** A branch whose upper bound is below this value cannot enter the list. */
+  floor() {
+    return this.byDps.size < SETUPS_PER_STYLE ? 0 : Math.min(...this.byDps.keys());
+  }
+  offer(c) {
+    const dps = round3(c.dps);
+    const known = this.byDps.get(dps);
+    if (known ? c.swaps >= known.swaps : dps < this.floor()) return;
+    this.byDps.set(dps, c);
+    if (this.byDps.size > SETUPS_PER_STYLE) this.byDps.delete(Math.min(...this.byDps.keys()));
+  }
+  ranked() {
+    return [...this.byDps.values()].sort((a, b) => b.dps - a.dps);
+  }
+};
+function searchAttack(template, attack, pool, worn, monster, top) {
   const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
-  if (slots.some((items) => items.plain.length === 0)) return null;
+  if (slots.some((items) => items.plain.length === 0)) return;
   const effective = effectiveNamed(template, attack, slots, monster);
-  const options = slots.map((items, i) => {
-    if (items.fixed) return items.plain;
-    const onStats = [...items.plain, ...items.named.filter((item) => !effective.has(item))];
-    return [...paretoFront(onStats, attack.style, worn[OTHER_SLOTS[i]]), ...items.named.filter((item) => effective.has(item))];
+  const choices = slots.map((items, i) => {
+    if (items.fixed) return { exact: items.plain, onStats: [] };
+    const quiet = items.named.filter((item) => !effective.has(item));
+    return {
+      exact: items.named.filter((item) => effective.has(item)),
+      onStats: distinctByStats([...items.plain, ...quiet], attack.style, worn[OTHER_SLOTS[i]])
+    };
   });
-  let best = null;
   const gear = { ...worn, weapon: attack.weapon };
-  const visit = (i) => {
-    if (i === OTHER_SLOTS.length) {
-      const dps = searchDps(template, attack, gear, monster);
-      const swaps = countSwaps(gear, worn);
-      if (dps > 0 && beats(dps, swaps, best)) {
-        best = {
-          attack,
-          gear: { ...gear },
-          dps,
-          swaps
-        };
-      }
+  const bound = (open2, from) => {
+    const bounded = { ...gear };
+    for (const i of open2.slice(from)) bounded[OTHER_SLOTS[i]] = upperBoundItem(OTHER_SLOTS[i], choices[i].onStats, attack.style);
+    return searchDps(template, attack, bounded, monster);
+  };
+  const chooseOnStats = (open2, from) => {
+    const dps = bound(open2, from);
+    if (dps <= 0 || round3(dps) < top.floor()) return;
+    if (from === open2.length) {
+      top.offer({
+        attack,
+        gear: { ...gear },
+        dps,
+        swaps: countSwaps(gear, worn)
+      });
       return;
     }
-    for (const option of options[i]) {
-      gear[OTHER_SLOTS[i]] = option;
-      visit(i + 1);
+    for (const option of choices[open2[from]].onStats) {
+      gear[OTHER_SLOTS[open2[from]]] = option;
+      chooseOnStats(open2, from + 1);
     }
   };
-  visit(0);
-  return best;
-}
-function keepWornWhereEqual(template, c, worn, monster) {
-  const gear = { ...c.gear };
-  for (const slot of OTHER_SLOTS) {
-    if (gear[slot] === worn[slot]) continue;
-    if (slot === "shield" && c.attack.weapon?.canon.isTwoHanded) continue;
-    const chosen = gear[slot];
-    gear[slot] = worn[slot];
-    if (searchDps(template, c.attack, gear, monster) !== c.dps) gear[slot] = chosen;
-  }
-  return { ...c, gear, swaps: countSwaps(gear, worn) };
+  const chooseExact = (i, open2) => {
+    if (i === OTHER_SLOTS.length) {
+      chooseOnStats(open2, 0);
+      return;
+    }
+    for (const option of choices[i].exact) {
+      gear[OTHER_SLOTS[i]] = option;
+      chooseExact(i + 1, open2);
+    }
+    if (choices[i].onStats.length) chooseExact(i + 1, [...open2, i]);
+  };
+  chooseExact(0, []);
 }
 function rankStyle(template, combat, pool, worn, spellbook, monster) {
-  const bestByWeapon = /* @__PURE__ */ new Map();
-  for (const attack of attacksFor(combat, pool.weapon, spellbook)) {
-    const found = bestForAttack(template, attack, pool, worn, monster);
-    if (found && beats(found.dps, found.swaps, bestByWeapon.get(attack.weapon))) bestByWeapon.set(attack.weapon, found);
-  }
-  return [...bestByWeapon.values()].sort((a, b) => b.dps - a.dps).slice(0, SETUPS_PER_STYLE).map((c) => keepWornWhereEqual(template, c, worn, monster));
+  const top = new TopSetups();
+  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top);
+  return top.ranked();
 }
 function describe2(template, c, worn, monster) {
   const result = calculate(playerWith(template, c.attack, c.gear, monster, (o) => o.item), monster);
@@ -331627,7 +331682,7 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
     title: "Best owned OSRS setup",
     description: `Rank the best setups the player OWNS against one monster version, per combat style (melee, ranged, magic). The owned pool is the worn gear, the inventory and the last bank snapshot from the DPS Bridge plugin. DPS comes from the OSRS Wiki DPS calculator engine with the player's live levels and prayers.
 
-Returns up to 3 setups per style: the best setup for each of the 3 best weapons. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
+Returns up to 3 setups per style: the 3 best overall. Setups with the same DPS count once (the one with the fewest swaps is shown), so two entries can use the same weapon. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
 
 Examples:
   - "Best setup I own vs Maggot King Far?" -> {monster: "Maggot King", monster_version: "Far"}

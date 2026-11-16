@@ -3,19 +3,19 @@
 //
 // Search, per combat style:
 //   1. An "attack" is one weapon + one of its combat styles (+ one spell for cast styles).
-//   2. Per other slot, keep the items that can matter for this attack:
-//        - plain items on the Pareto front of the two stats the style uses (accuracy bonus, strength bonus)
-//        - items the engine names in its code (set effects, slayer helmet, tomes...), when an engine probe
-//          shows that their name changes the result for this attack
-//   3. Try every combination of the kept items with the engine. Keep the best setup per weapon.
-//   4. Report the 3 best weapons, each with its best setup.
+//   2. Per other slot, sort the items in two groups for this attack:
+//        - exact: items the engine names in its code (set effects, slayer helmet, tomes...), when an engine
+//          probe shows that their name changes the result for this attack. Each one is tried as it is.
+//        - on stats: all other items. Only the two stats the style uses count (accuracy bonus, strength bonus).
+//   3. Branch and bound over the "on stats" items: an item that does not exist, with the best stats of a slot,
+//      gives the engine's upper bound for a whole branch. A branch that cannot reach the top 3 is skipped.
+//   4. Report the 3 best setups of the style. Setups with the same DPS count once: the one with the fewest swaps.
 //
-// The pruning in step 2 is exact when these hold (a test compares the result with an exhaustive search):
+// The search is exact when these hold (a test compares the result with an exhaustive search):
 //   A1. A plain item changes DPS only through the two stats of the style. (Known gap: Dinh's bulwark uses defence stats.)
 //   A2. More of those stats never lowers DPS.
 //   A3. An item with any other effect is in engineNamedItems.json (scanned from the engine source).
-//   A4. Among spells of one element, the higher base max hit never does less DPS.
-//   A5. A named item, or set of named items, that changes nothing in the best plain gear changes nothing in the best setup.
+//   A4. A named item, or set of named items, that changes nothing in the best plain gear changes nothing in the best setup.
 import PlayerVsNPCCalc from '@/lib/PlayerVsNPCCalc';
 import {
   AmmoApplicability, ammoApplicability, calculateAttackSpeed, calculateEquipmentBonusesFromGear, equipmentAliases,
@@ -134,9 +134,8 @@ function combatStyleOf(style: PlayerCombatStyle): CombatStyle | null {
 }
 
 function spellCandidates(spellbook: LiveState['spellbook']): Spell[] {
-  const usable = spells.filter((s) => s.spellbook === spellbook && s.max_hit > 0);
-  // A4: of the spells of one element, only the one with the highest base max hit
-  return usable.filter((s) => !s.element || !usable.some((o) => o.element === s.element && o.max_hit > s.max_hit));
+  // The strongest spells first: they fill the top 3 early, and the weak spells are then cut at their bound.
+  return spells.filter((s) => s.spellbook === spellbook && s.max_hit > 0).sort((a, b) => b.max_hit - a.max_hit);
 }
 
 function attacksFor(combat: CombatStyle, weapons: Owned[], spellbook: LiveState['spellbook']): Attack[] {
@@ -229,18 +228,42 @@ function slotItems(slot: Slot, attack: Attack, owned: Owned[], worn: Owned | nul
   };
 }
 
-/** The items that no other item beats or equals on both stats of the style (A1, A2). */
-function paretoFront(items: (Owned | null)[], style: PlayerCombatStyle, worn: Owned | null): (Owned | null)[] {
+/** One item per different pair of style stats (A1: equal stats give equal DPS), the strongest first. */
+function distinctByStats(items: (Owned | null)[], style: PlayerCombatStyle, worn: Owned | null): (Owned | null)[] {
   // On equal stats, keep the worn item (no swap), then the empty slot, then the lowest id.
   const rank = (o: Owned | null) => (o === worn ? -2 : o?.canon.id ?? -1);
-  return items.filter((p) => {
-    const [pa, ps] = styleStats(p, style);
-    return !items.some((q) => {
-      if (q === p) return false;
-      const [qa, qs] = styleStats(q, style);
-      return qa >= pa && qs >= ps && (qa > pa || qs > ps || rank(q) < rank(p));
-    });
-  });
+  const byStats = new Map<string, Owned | null>();
+  for (const item of items) {
+    const key = styleStats(item, style).join('|');
+    const known = byStats.get(key);
+    if (!byStats.has(key) || rank(item) < rank(known!)) byStats.set(key, item);
+  }
+  const total = (o: Owned | null) => styleStats(o, style)[0] + styleStats(o, style)[1];
+  return [...byStats.values()].sort((a, b) => total(b) - total(a));
+}
+
+/**
+ * An item that does not exist: the best accuracy bonus and the best strength bonus of `options` in one piece.
+ * With it in a slot, the engine gives an upper bound on the DPS of every real option for that slot (A1, A2).
+ */
+function upperBoundItem(slot: Slot, options: (Owned | null)[], style: PlayerCombatStyle): Owned {
+  const stats = options.map((o) => styleStats(o, style));
+  const accuracy = Math.max(...stats.map(([a]) => a));
+  const strength = Math.max(...stats.map(([, s]) => s));
+  const zero = {
+    stab: 0, slash: 0, crush: 0, magic: 0, ranged: 0,
+  };
+  const canon: EquipmentPiece = {
+    name: '', id: -1, version: '', slot, image: '', weight: 0, speed: 0, category: EquipmentCategory.NONE, isTwoHanded: false,
+    offensive: { ...zero, [style.type!]: accuracy },
+    defensive: { ...zero },
+    bonuses: {
+      str: 0, ranged_str: 0, magic_str: 0, prayer: 0, [style.type === 'magic' ? 'magic_str' : style.type === 'ranged' ? 'ranged_str' : 'str']: strength,
+    },
+  };
+  return {
+    ownedId: -1, item: canon, canon, source: 'bank',
+  };
 }
 
 /** Above this many combinations of quiet named items, the set probe is skipped and all of them stay in the search. */
@@ -297,66 +320,94 @@ function effectiveNamed(template: Player, attack: Attack, slots: SlotItems[], mo
 
 const countSwaps = (gear: Gear, worn: Gear) => SLOTS.filter((s) => gear[s] !== worn[s]).length;
 
-/** More DPS wins. On equal DPS, fewer swaps win. */
-const beats = (dps: number, swaps: number, other: Candidate | null | undefined) => !other
-  || dps > other.dps || (dps === other.dps && swaps < other.swaps);
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
-function bestForAttack(template: Player, attack: Attack, pool: Record<Slot, Owned[]>, worn: Gear, monster: Monster): Candidate | null {
-  const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
-  if (slots.some((items) => items.plain.length === 0)) return null;
-  const effective = effectiveNamed(template, attack, slots, monster);
-  // A named item with no effect of its own for this attack competes on stats, like a plain item.
-  const options = slots.map((items, i) => {
-    if (items.fixed) return items.plain;
-    const onStats = [...items.plain, ...items.named.filter((item) => !effective.has(item))];
-    return [...paretoFront(onStats, attack.style, worn[OTHER_SLOTS[i]]), ...items.named.filter((item) => effective.has(item))];
-  });
+/**
+ * The best setups found so far for one combat style: one per DPS value (as shown, 3 decimals), at most
+ * SETUPS_PER_STYLE values. Setups with the same DPS are one entry: the one with the fewest swaps.
+ */
+class TopSetups {
+  private byDps = new Map<number, Candidate>();
 
-  let best: Candidate | null = null;
-  const gear = { ...worn, weapon: attack.weapon };
-  const visit = (i: number) => {
-    if (i === OTHER_SLOTS.length) {
-      const dps = searchDps(template, attack, gear, monster);
-      const swaps = countSwaps(gear, worn);
-      if (dps > 0 && beats(dps, swaps, best)) {
-        best = {
-          attack, gear: { ...gear }, dps, swaps,
-        };
-      }
-      return;
-    }
-    for (const option of options[i]) {
-      gear[OTHER_SLOTS[i]] = option;
-      visit(i + 1);
-    }
-  };
-  visit(0);
-  return best;
+  /** A branch whose upper bound is below this value cannot enter the list. */
+  floor(): number {
+    return this.byDps.size < SETUPS_PER_STYLE ? 0 : Math.min(...this.byDps.keys());
+  }
+
+  offer(c: Candidate) {
+    const dps = round3(c.dps);
+    const known = this.byDps.get(dps);
+    if (known ? c.swaps >= known.swaps : dps < this.floor()) return;
+    this.byDps.set(dps, c);
+    if (this.byDps.size > SETUPS_PER_STYLE) this.byDps.delete(Math.min(...this.byDps.keys()));
+  }
+
+  ranked(): Candidate[] {
+    return [...this.byDps.values()].sort((a, b) => b.dps - a.dps);
+  }
 }
 
-/** Puts a worn item back wherever it gives exactly the same DPS: the plan never asks for a swap that gains nothing. */
-function keepWornWhereEqual(template: Player, c: Candidate, worn: Gear, monster: Monster): Candidate {
-  const gear = { ...c.gear };
-  for (const slot of OTHER_SLOTS) {
-    if (gear[slot] === worn[slot]) continue;
-    if (slot === 'shield' && c.attack.weapon?.canon.isTwoHanded) continue;
-    const chosen = gear[slot];
-    gear[slot] = worn[slot];
-    if (searchDps(template, c.attack, gear, monster) !== c.dps) gear[slot] = chosen;
-  }
-  return { ...c, gear, swaps: countSwaps(gear, worn) };
+/**
+ * Searches every setup of one attack and offers each one that can enter `top`. Branch and bound:
+ * the slots not chosen yet hold an upper-bound item, so one engine call bounds a whole branch.
+ */
+function searchAttack(template: Player, attack: Attack, pool: Record<Slot, Owned[]>, worn: Gear, monster: Monster, top: TopSetups) {
+  const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
+  if (slots.some((items) => items.plain.length === 0)) return;
+  const effective = effectiveNamed(template, attack, slots, monster);
+
+  // An upper-bound item has no name and no id, so it cannot stand for an item with an effect of its own
+  // or for ammo. Those are `exact` choices: each one is tried as it is. All other items are `onStats`.
+  const choices = slots.map((items, i) => {
+    if (items.fixed) return { exact: items.plain, onStats: [] as (Owned | null)[] };
+    // A named item with no effect of its own for this attack competes on stats, like a plain item.
+    const quiet = items.named.filter((item) => !effective.has(item));
+    return {
+      exact: items.named.filter((item) => effective.has(item)) as (Owned | null)[],
+      onStats: distinctByStats([...items.plain, ...quiet], attack.style, worn[OTHER_SLOTS[i]]),
+    };
+  });
+
+  const gear = { ...worn, weapon: attack.weapon };
+  // Phase 2: the slots in `open` take an item on stats, strongest first, under the bound.
+  const bound = (open: number[], from: number) => {
+    const bounded = { ...gear };
+    for (const i of open.slice(from)) bounded[OTHER_SLOTS[i]] = upperBoundItem(OTHER_SLOTS[i], choices[i].onStats, attack.style);
+    return searchDps(template, attack, bounded, monster);
+  };
+  const chooseOnStats = (open: number[], from: number) => {
+    const dps = bound(open, from);
+    if (dps <= 0 || round3(dps) < top.floor()) return;
+    if (from === open.length) {
+      top.offer({
+        attack, gear: { ...gear }, dps, swaps: countSwaps(gear, worn),
+      });
+      return;
+    }
+    for (const option of choices[open[from]].onStats) {
+      gear[OTHER_SLOTS[open[from]]] = option;
+      chooseOnStats(open, from + 1);
+    }
+  };
+  // Phase 1: per slot, take one exact choice, or leave the slot open for phase 2.
+  const chooseExact = (i: number, open: number[]) => {
+    if (i === OTHER_SLOTS.length) {
+      chooseOnStats(open, 0);
+      return;
+    }
+    for (const option of choices[i].exact) {
+      gear[OTHER_SLOTS[i]] = option;
+      chooseExact(i + 1, open);
+    }
+    if (choices[i].onStats.length) chooseExact(i + 1, [...open, i]);
+  };
+  chooseExact(0, []);
 }
 
 function rankStyle(template: Player, combat: CombatStyle, pool: Record<Slot, Owned[]>, worn: Gear, spellbook: LiveState['spellbook'], monster: Monster): Candidate[] {
-  const bestByWeapon = new Map<Owned | null, Candidate>();
-  for (const attack of attacksFor(combat, pool.weapon, spellbook)) {
-    const found = bestForAttack(template, attack, pool, worn, monster);
-    if (found && beats(found.dps, found.swaps, bestByWeapon.get(attack.weapon))) bestByWeapon.set(attack.weapon, found);
-  }
-  return [...bestByWeapon.values()]
-    .sort((a, b) => b.dps - a.dps)
-    .slice(0, SETUPS_PER_STYLE)
-    .map((c) => keepWornWhereEqual(template, c, worn, monster));
+  const top = new TopSetups();
+  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top);
+  return top.ranked();
 }
 
 // ---------- plan ----------

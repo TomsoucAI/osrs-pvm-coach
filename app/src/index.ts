@@ -254,7 +254,7 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
     title: 'Best owned OSRS setup',
     description: `Rank the best setups the player OWNS against one monster version, per combat style (melee, ranged, magic). The owned pool is the worn gear, the inventory and the last bank snapshot from the DPS Bridge plugin. DPS comes from the OSRS Wiki DPS calculator engine with the player's live levels and prayers.
 
-Returns up to 3 setups per style: the best setup for each of the 3 best weapons. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
+Returns up to 3 setups per style: the 3 best overall. Setups with the same DPS count once (the one with the fewest swaps is shown), so two entries can use the same weapon. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
 
 Examples:
   - "Best setup I own vs Maggot King Far?" -> {monster: "Maggot King", monster_version: "Far"}
