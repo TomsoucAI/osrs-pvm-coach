@@ -39,10 +39,16 @@ Do each action in game and confirm the printout changes:
 | Drink a combat potion | `Levels` shows e.g. `attack 118/99` |
 | Turn on Piety / Rigour / Augury | `Prayers` lists it, DPS goes up |
 | Attack an NPC | `Target` = that NPC, DPS vs it |
+| Withdraw or deposit an item | `Inventory` count and list change |
+| Add or remove runes in the rune pouch | `Rune pouch` shows each rune id and quantity |
+| Change spellbook | `Spellbook` = standard / ancient / lunar / arceuus |
+| Open the bank, then withdraw an item | `Bank` shows the stack count, `seen 0 s ago` |
+| Close the bank, restart the client, log in | `Bank` is still there, with its age |
 | Log out | `✗ No live RuneLite data` (or WikiSync fallback) |
 
 Raw file if you want to look: `~/.runelite/plugin-data/dps_bridge/state.json`
 (Windows: `%USERPROFILE%\.runelite\plugin-data\dps_bridge\state.json`)
+The bank snapshot is `bank.json` in the same folder.
 
 ## Level 4 · Claude
 Restart Claude Code / fully quit and reopen Claude Desktop, then ask:

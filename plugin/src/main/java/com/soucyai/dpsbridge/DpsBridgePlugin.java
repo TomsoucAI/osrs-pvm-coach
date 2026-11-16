@@ -51,7 +51,9 @@ import net.runelite.api.Skill;
 import net.runelite.api.StructComposition;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.eventbus.Subscribe;
@@ -61,17 +63,33 @@ import net.runelite.client.util.Filepath;
 
 /**
  * Writes the player's combat state to ~/.runelite/plugin-data/dps_bridge/state.json so a local
- * MCP server can run DPS calculations on it. Read-only: never sends input to the game.
+ * MCP server can run DPS calculations on it. Writes the bank to bank.json in the same folder
+ * each time the game sends the bank container. Read-only: never sends input to the game.
  */
 @Slf4j
 @PluginDescriptor(
 	name = "DPS Bridge",
 	internalName = "dps_bridge",
-	description = "Exports gear, boosted levels, prayers, attack style and target for an external DPS calculator",
+	description = "Exports gear, inventory, bank, rune pouch, spellbook, boosted levels, prayers, attack style and target for an external DPS calculator",
 	tags = {"dps", "calculator", "mcp", "combat"}
 )
 public class DpsBridgePlugin extends Plugin
 {
+	private static final int STATE_VERSION = 2;
+	private static final String STATE_FILE = "state.json";
+	private static final String BANK_FILE = "bank.json";
+
+	private static final int[] RUNE_POUCH_TYPES = {
+		VarbitID.RUNE_POUCH_TYPE_1, VarbitID.RUNE_POUCH_TYPE_2, VarbitID.RUNE_POUCH_TYPE_3,
+		VarbitID.RUNE_POUCH_TYPE_4, VarbitID.RUNE_POUCH_TYPE_5, VarbitID.RUNE_POUCH_TYPE_6
+	};
+	private static final int[] RUNE_POUCH_QUANTITIES = {
+		VarbitID.RUNE_POUCH_QUANTITY_1, VarbitID.RUNE_POUCH_QUANTITY_2, VarbitID.RUNE_POUCH_QUANTITY_3,
+		VarbitID.RUNE_POUCH_QUANTITY_4, VarbitID.RUNE_POUCH_QUANTITY_5, VarbitID.RUNE_POUCH_QUANTITY_6
+	};
+	// VarbitID.SPELLBOOK value -> name, in value order
+	private static final String[] SPELLBOOKS = {"standard", "ancient", "lunar", "arceuus"};
+
 	@Inject
 	private Client client;
 
@@ -125,7 +143,7 @@ public class DpsBridgePlugin extends Plugin
 		}
 
 		JsonObject j = new JsonObject();
-		j.addProperty("version", 1);
+		j.addProperty("version", STATE_VERSION);
 		j.addProperty("loggedIn", true);
 		j.addProperty("playerName", me.getName());
 		j.add("equipment", equipment());
@@ -134,6 +152,9 @@ public class DpsBridgePlugin extends Plugin
 		j.add("prayers", prayers());
 		addStyle(j);
 		j.add("buffs", buffs());
+		j.add("inventory", items(client.getItemContainer(InventoryID.INV)));
+		j.add("runePouch", runePouch());
+		addSpellbook(j);
 
 		Actor target = me.getInteracting();
 		if (target instanceof NPC)
@@ -155,7 +176,76 @@ public class DpsBridgePlugin extends Plugin
 
 		JsonObject withTime = j.deepCopy();
 		withTime.addProperty("timestamp", System.currentTimeMillis());
-		write(gson.toJson(withTime));
+		write(STATE_FILE, gson.toJson(withTime));
+	}
+
+	// The game sends the bank container only while the bank is open, so the last file stays as
+	// the snapshot after the bank closes and after a client restart.
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged e)
+	{
+		if (e.getContainerId() != InventoryID.BANK)
+		{
+			return;
+		}
+
+		JsonObject j = new JsonObject();
+		j.addProperty("timestamp", System.currentTimeMillis());
+		j.add("items", items(e.getItemContainer()));
+		write(BANK_FILE, gson.toJson(j));
+	}
+
+	private JsonArray items(ItemContainer container)
+	{
+		JsonArray a = new JsonArray();
+		if (container == null)
+		{
+			return a;
+		}
+
+		for (Item item : container.getItems())
+		{
+			int id = item.getId();
+			if (id <= 0 || id == ItemID.BANK_FILLER || item.getQuantity() <= 0
+				|| client.getItemDefinition(id).getPlaceholderTemplateId() != -1)
+			{
+				continue; // empty slot, bank filler or bank placeholder: not an owned item
+			}
+
+			JsonObject o = new JsonObject();
+			o.addProperty("id", id);
+			o.addProperty("quantity", item.getQuantity());
+			a.add(o);
+		}
+		return a;
+	}
+
+	private JsonArray runePouch()
+	{
+		JsonArray a = new JsonArray();
+		EnumComposition runes = client.getEnum(EnumID.RUNEPOUCH_RUNE);
+		for (int i = 0; i < RUNE_POUCH_TYPES.length; i++)
+		{
+			int type = client.getVarbitValue(RUNE_POUCH_TYPES[i]);
+			int quantity = client.getVarbitValue(RUNE_POUCH_QUANTITIES[i]);
+			if (type == 0 || quantity == 0)
+			{
+				continue; // empty pouch slot
+			}
+
+			JsonObject o = new JsonObject();
+			o.addProperty("runeItemId", runes.getIntValue(type));
+			o.addProperty("quantity", quantity);
+			a.add(o);
+		}
+		return a;
+	}
+
+	private void addSpellbook(JsonObject j)
+	{
+		int book = client.getVarbitValue(VarbitID.SPELLBOOK);
+		// null = a spellbook value that this plugin does not know
+		j.addProperty("spellbook", book >= 0 && book < SPELLBOOKS.length ? SPELLBOOKS[book] : null);
 	}
 
 	private JsonObject equipment()
@@ -269,13 +359,13 @@ public class DpsBridgePlugin extends Plugin
 	{
 		lastJson = null;
 		JsonObject j = new JsonObject();
-		j.addProperty("version", 1);
+		j.addProperty("version", STATE_VERSION);
 		j.addProperty("loggedIn", false);
 		j.addProperty("timestamp", System.currentTimeMillis());
-		write(gson.toJson(j));
+		write(STATE_FILE, gson.toJson(j));
 	}
 
-	private void write(String json)
+	private void write(String fileName, String json)
 	{
 		if (writer == null || writer.isShutdown())
 		{
@@ -286,8 +376,8 @@ public class DpsBridgePlugin extends Plugin
 			try
 			{
 				dir.createDirectories();
-				Filepath tmp = dir.join("state.json.tmp");
-				Filepath file = dir.join("state.json");
+				Filepath tmp = dir.join(fileName + ".tmp");
+				Filepath file = dir.join(fileName);
 				tmp.write(json.getBytes(StandardCharsets.UTF_8));
 				try
 				{
