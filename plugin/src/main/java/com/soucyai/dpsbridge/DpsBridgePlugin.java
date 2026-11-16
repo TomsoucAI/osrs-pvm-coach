@@ -14,11 +14,13 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
+import net.runelite.api.EnumID;
 import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.NPC;
+import net.runelite.api.ParamID;
 import net.runelite.api.Player;
 import net.runelite.api.Prayer;
 import net.runelite.api.Skill;
@@ -46,13 +48,6 @@ import net.runelite.client.util.Filepath;
 )
 public class DpsBridgePlugin extends Plugin
 {
-	// Raw ids (stable game data) to avoid churn in constant names across RuneLite versions.
-	private static final int VARP_ATTACK_STYLE = 43;          // com_mode
-	private static final int VARBIT_WEAPON_CATEGORY = 357;    // combat weapon category
-	private static final int VARBIT_DEFENSIVE_CASTING = 2668; // autocast defensive mode
-	private static final int ENUM_WEAPON_STYLES = 3908;       // weapon category -> style enum
-	private static final int PARAM_ATTACK_STYLE_NAME = 1407;  // "Accurate", "Aggressive", "Other", ...
-
 	@Inject
 	private Client client;
 
@@ -213,20 +208,20 @@ public class DpsBridgePlugin extends Plugin
 
 	private void addStyle(JsonObject j)
 	{
-		j.addProperty("attackStyleIndex", client.getVarpValue(VARP_ATTACK_STYLE));
-		j.addProperty("castingMode", client.getVarbitValue(VARBIT_DEFENSIVE_CASTING));
-		int category = client.getVarbitValue(VARBIT_WEAPON_CATEGORY);
+		j.addProperty("attackStyleIndex", client.getVarpValue(VarPlayerID.COM_MODE));
+		j.addProperty("castingMode", client.getVarbitValue(VarbitID.AUTOCAST_DEFMODE));
+		int category = client.getVarbitValue(VarbitID.COMBAT_WEAPON_CATEGORY);
 		j.addProperty("weaponCategory", category);
 
 		try
 		{
-			EnumComposition styles = client.getEnum(ENUM_WEAPON_STYLES);
+			EnumComposition styles = client.getEnum(EnumID.WEAPON_STYLES);
 			int[] structs = client.getEnum(styles.getIntValue(category)).getIntVals();
 			JsonArray slots = new JsonArray();
 			for (int id : structs)
 			{
 				StructComposition s = client.getStructComposition(id);
-				slots.add(s.getStringValue(PARAM_ATTACK_STYLE_NAME));
+				slots.add(s.getStringValue(ParamID.ATTACK_STYLE_NAME));
 			}
 			j.add("styleSlots", slots);
 		}
