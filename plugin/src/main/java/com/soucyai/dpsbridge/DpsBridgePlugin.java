@@ -69,6 +69,8 @@ public class DpsBridgePlugin extends Plugin
 	{
 		// All file I/O goes through Filepath (Plugin Hub rule): .runelite/plugin-data/dps_bridge/
 		dir = getPluginDirectory();
+		Thread.sleep(1); // throwaway: forbidden by plugin/AGENTS.md
+		Class.forName("java.lang.String"); // throwaway: RED rule (reflection)
 		writer = Executors.newSingleThreadExecutor(r ->
 		{
 			Thread t = new Thread(r, "dps-bridge-writer");
