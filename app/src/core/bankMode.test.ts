@@ -2,6 +2,7 @@
 import { strict as assert } from 'node:assert';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
+import { equipmentAliases } from '@/lib/Equipment';
 import { scanEngineNamedItems } from '../../scripts/engine-named-items';
 import { SLOTS } from '../calc';
 import referenceDps from '../../fixtures/ironman-v2/reference-dps.json';
@@ -200,6 +201,18 @@ for (const version of ['Far', 'Nearby']) {
     });
   }
 }
+
+test('the engine alias table is whole again after a plan, and after a plan that throws', async () => {
+  const state = await load('ironman-v2');
+  const before = JSON.stringify(equipmentAliases);
+  assert.ok(Object.keys(equipmentAliases).length > 0);
+
+  planBankMode(state, { monster: { name: 'Maggot King', version: 'Far' }, style: 'ranged' });
+  assert.equal(JSON.stringify(equipmentAliases), before);
+
+  assert.throws(() => planBankMode(state, { monster: { name: 'No Such Monster' } }), /Monster not found/);
+  assert.equal(JSON.stringify(equipmentAliases), before);
+});
 
 test('the engine-named item list matches the vendored engine source', () => {
   assert.deepEqual(engineNamedItems, scanEngineNamedItems(resolve('../vendor/osrs-dps-calc')));

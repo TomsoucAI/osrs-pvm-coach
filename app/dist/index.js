@@ -331174,14 +331174,14 @@ function effectiveNamed(template, attack, slots, monster) {
     base[OTHER_SLOTS[i]] = items.plain.reduce((a, b) => total(b) > total(a) ? b : a, items.plain[0] ?? null);
   });
   const ghost = (o) => ({ ...o, canon: { ...o.canon, id: -1, name: "" } });
-  const result = (items) => {
+  const fingerprint = (items) => {
     const gear = { ...base };
     for (const o of items) gear[o.canon.slot] = o;
     const player = playerWith(template, attack, gear, monster, (o) => o.canon);
     const calc = new PlayerVsNPCCalc(player, monster, { loadoutName: template.name });
     return JSON.stringify([calc.getDps(), calc.getDistribution().getMax(), calc.getHitChance(), player.bonuses, player.offensive]);
   };
-  const namesMatter = (items, ghosted) => result(items) !== result(items.map((o) => ghosted.includes(o) ? ghost(o) : o));
+  const namesMatter = (items, ghosted) => fingerprint(items) !== fingerprint(items.map((o) => ghosted.includes(o) ? ghost(o) : o));
   const kept = /* @__PURE__ */ new Set();
   const quietBySlot = [];
   for (const { named } of slots) {
@@ -331203,6 +331203,7 @@ function effectiveNamed(template, attack, slots, monster) {
   return kept;
 }
 var countSwaps = (gear, worn) => SLOTS.filter((s) => gear[s] !== worn[s]).length;
+var beats = (dps, swaps, other) => !other || dps > other.dps || dps === other.dps && swaps < other.swaps;
 function bestForAttack(template, attack, pool, worn, monster) {
   const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
   if (slots.some((items) => items.plain.length === 0)) return null;
@@ -331218,7 +331219,7 @@ function bestForAttack(template, attack, pool, worn, monster) {
     if (i === OTHER_SLOTS.length) {
       const dps = searchDps(template, attack, gear, monster);
       const swaps = countSwaps(gear, worn);
-      if (dps > 0 && (!best || dps > best.dps || dps === best.dps && swaps < best.swaps)) {
+      if (dps > 0 && beats(dps, swaps, best)) {
         best = {
           attack,
           gear: { ...gear },
@@ -331251,10 +331252,7 @@ function rankStyle(template, combat, pool, worn, spellbook, monster) {
   const bestByWeapon = /* @__PURE__ */ new Map();
   for (const attack of attacksFor(combat, pool.weapon, spellbook)) {
     const found = bestForAttack(template, attack, pool, worn, monster);
-    const known = bestByWeapon.get(attack.weapon);
-    if (found && (!known || found.dps > known.dps || found.dps === known.dps && found.swaps < known.swaps)) {
-      bestByWeapon.set(attack.weapon, found);
-    }
+    if (found && beats(found.dps, found.swaps, bestByWeapon.get(attack.weapon))) bestByWeapon.set(attack.weapon, found);
   }
   return [...bestByWeapon.values()].sort((a, b) => b.dps - a.dps).slice(0, SETUPS_PER_STYLE).map((c) => keepWornWhereEqual(template, c, worn, monster));
 }
@@ -331306,7 +331304,7 @@ function planBankMode(state, request) {
   if (notEquipment) {
     notes.push(`${notEquipment} owned items in the inventory and bank are not equipment in the Wiki calculator's data (supplies, or very new gear); ignored.`);
   }
-  if (state.autocastSpell && !spells.some((s) => s.name.toLowerCase() === state.autocastSpell.toLowerCase())) {
+  if (wanted.includes("magic") && state.autocastSpell && !spells.some((s) => s.name.toLowerCase() === state.autocastSpell.toLowerCase())) {
     notes.push(`Spell "${state.autocastSpell}" isn't in the Wiki calculator's data; ignored.`);
   }
   if (!state.bank) {

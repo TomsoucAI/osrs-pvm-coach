@@ -13,6 +13,7 @@ import {
   buildPlayer, findItem, resolveMonster, SLOTS, type DefenceReductions,
 } from '../calc';
 import type { LiveState } from './liveState';
+import type { CombatStyle } from './phaseRules';
 
 type Slot = keyof PlayerEquipment;
 
@@ -31,7 +32,7 @@ const ISSUES_THAT_BLOCK = ['equipment_slot_ammo_missing', 'equipment_slot_ammo_w
 export function exhaustiveSearch(
   state: LiveState,
   monsterSpec: { name: string; version?: string; reductions?: DefenceReductions },
-  combat: 'melee' | 'ranged' | 'magic',
+  combat: CombatStyle,
 ): OracleSetup[] {
   const monster = resolveMonster(monsterSpec);
   const piece = (id: number | null | undefined): EquipmentPiece | null => {
@@ -84,7 +85,8 @@ export function exhaustiveSearch(
             player.attackSpeed = calculateAttackSpeed(player, monster);
             const calc = new PlayerVsNPCCalc(player, monster, { loadoutName: 'oracle' });
             if (calc.userIssues.some((issue) => ISSUES_THAT_BLOCK.includes(issue.type))) return;
-            const dps = round3(calc.getDps());
+            // Raw DPS decides, as in bankMode.ts. It is rounded only in the returned list.
+            const dps = calc.getDps();
             if (dps <= 0) return;
             const swaps = SLOTS.filter((s) => (equipment[s]?.id ?? null) !== (worn[s]?.id ?? null)).length;
             const known = best.get(weapon);
@@ -107,5 +109,5 @@ export function exhaustiveSearch(
   } finally {
     for (const [base, variants] of savedAliases) equipmentAliases[Number(base)] = variants;
   }
-  return [...best.values()].sort((a, b) => b.dps - a.dps).slice(0, 3);
+  return [...best.values()].sort((a, b) => b.dps - a.dps).slice(0, 3).map((s) => ({ ...s, dps: round3(s.dps) }));
 }

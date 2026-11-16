@@ -261,7 +261,7 @@ function effectiveNamed(template: Player, attack: Attack, slots: SlotItems[], mo
     base[OTHER_SLOTS[i]] = items.plain.reduce((a, b) => (total(b) > total(a) ? b : a), items.plain[0] ?? null);
   });
   const ghost = (o: Owned): Owned => ({ ...o, canon: { ...o.canon, id: -1, name: '' } });
-  const result = (items: Owned[]) => {
+  const fingerprint = (items: Owned[]) => {
     const gear = { ...base };
     for (const o of items) gear[o.canon.slot] = o;
     const player = playerWith(template, attack, gear, monster, (o) => o.canon);
@@ -269,7 +269,7 @@ function effectiveNamed(template: Player, attack: Attack, slots: SlotItems[], mo
     return JSON.stringify([calc.getDps(), calc.getDistribution().getMax(), calc.getHitChance(), player.bonuses, player.offensive]);
   };
   /** True when the names of `ghosted` (a part of `items`) change the engine's result. */
-  const namesMatter = (items: Owned[], ghosted: Owned[]) => result(items) !== result(items.map((o) => (ghosted.includes(o) ? ghost(o) : o)));
+  const namesMatter = (items: Owned[], ghosted: Owned[]) => fingerprint(items) !== fingerprint(items.map((o) => (ghosted.includes(o) ? ghost(o) : o)));
 
   const kept = new Set<Owned>();
   const quietBySlot: Owned[][] = [];
@@ -297,6 +297,10 @@ function effectiveNamed(template: Player, attack: Attack, slots: SlotItems[], mo
 
 const countSwaps = (gear: Gear, worn: Gear) => SLOTS.filter((s) => gear[s] !== worn[s]).length;
 
+/** More DPS wins. On equal DPS, fewer swaps win. */
+const beats = (dps: number, swaps: number, other: Candidate | null | undefined) => !other
+  || dps > other.dps || (dps === other.dps && swaps < other.swaps);
+
 function bestForAttack(template: Player, attack: Attack, pool: Record<Slot, Owned[]>, worn: Gear, monster: Monster): Candidate | null {
   const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
   if (slots.some((items) => items.plain.length === 0)) return null;
@@ -314,7 +318,7 @@ function bestForAttack(template: Player, attack: Attack, pool: Record<Slot, Owne
     if (i === OTHER_SLOTS.length) {
       const dps = searchDps(template, attack, gear, monster);
       const swaps = countSwaps(gear, worn);
-      if (dps > 0 && (!best || dps > best.dps || (dps === best.dps && swaps < best.swaps))) {
+      if (dps > 0 && beats(dps, swaps, best)) {
         best = {
           attack, gear: { ...gear }, dps, swaps,
         };
@@ -347,10 +351,7 @@ function rankStyle(template: Player, combat: CombatStyle, pool: Record<Slot, Own
   const bestByWeapon = new Map<Owned | null, Candidate>();
   for (const attack of attacksFor(combat, pool.weapon, spellbook)) {
     const found = bestForAttack(template, attack, pool, worn, monster);
-    const known = bestByWeapon.get(attack.weapon);
-    if (found && (!known || found.dps > known.dps || (found.dps === known.dps && found.swaps < known.swaps))) {
-      bestByWeapon.set(attack.weapon, found);
-    }
+    if (found && beats(found.dps, found.swaps, bestByWeapon.get(attack.weapon))) bestByWeapon.set(attack.weapon, found);
   }
   return [...bestByWeapon.values()]
     .sort((a, b) => b.dps - a.dps)
@@ -409,7 +410,7 @@ export function planBankMode(state: LiveState, request: BankModeRequest): BankMo
   if (notEquipment) {
     notes.push(`${notEquipment} owned items in the inventory and bank are not equipment in the Wiki calculator's data (supplies, or very new gear); ignored.`);
   }
-  if (state.autocastSpell && !spells.some((s) => s.name.toLowerCase() === state.autocastSpell!.toLowerCase())) {
+  if (wanted.includes('magic') && state.autocastSpell && !spells.some((s) => s.name.toLowerCase() === state.autocastSpell!.toLowerCase())) {
     notes.push(`Spell "${state.autocastSpell}" isn't in the Wiki calculator's data; ignored.`);
   }
   if (!state.bank) {
