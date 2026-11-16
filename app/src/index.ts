@@ -11,6 +11,9 @@ import {
   searchMonsters, VALID,
 } from './calc';
 import { bridgeFile, getSnapshot, Snapshot } from './snapshot';
+import { planBankMode, type Setup } from './core/bankMode';
+import { readState } from './core/liveState';
+import { dirname, join } from 'node:path';
 import type { Monster } from '@/types/Monster';
 
 const CHARACTER_LIMIT = 25_000;
@@ -123,6 +126,18 @@ function mdLoadout(l: ReturnType<typeof describeLoadout>) {
   ].join('\n');
 }
 
+function mdSetup(s: Setup, rank: number) {
+  const gear = Object.entries(s.items).filter(([, item]) => item).map(([slot, item]) => `${slot}: ${item!.name} [${item!.source}]`).join(' · ');
+  const swaps = s.swaps.map((w) => `${w.slot}: ${w.from ?? 'empty'} → ${w.to ? `${w.to} [${w.source}]` : 'empty'}`).join('; ');
+  return [
+    `${rank}. **${s.dps} DPS** · max hit ${s.maxHit} · accuracy ${s.accuracyPct}% · avg kill ${s.avgTtkSeconds ?? '?'}s · ${s.style}${s.spell ? ` · ${s.spell}` : ''}`,
+    `   - **Gear**: ${gear || '(nothing equipped)'}`,
+    `   - **Swaps (${s.swaps.length})**: ${swaps || 'none, this is what you wear now'}`,
+  ].join('\n');
+}
+
+const mdAge = (ms: number) => (ms < 3_600_000 ? `${Math.max(0, Math.round(ms / 60_000))} min` : `${Math.round(ms / 3_600_000)} h`);
+
 // ---------- server ----------
 
 function createServer(): McpServer {
@@ -233,6 +248,44 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
         ? `| ${i + 1} | ${r.label} | | error: ${r.error} | | | |`
         : `| ${i + 1} | ${r.label} | ${r.defence} | ${r.dps} | ${r.max_hit} | ${r.accuracy_pct}% | ${r.avg_ttk_seconds ?? '?'}s |`)),
     ].join('\n') + mdNotes(notes));
+  });
+
+  server.registerTool('osrs_best_owned_setup', {
+    title: 'Best owned OSRS setup',
+    description: `Rank the best setups the player OWNS against one monster version, per combat style (melee, ranged, magic). The owned pool is the worn gear, the inventory and the last bank snapshot from the DPS Bridge plugin. DPS comes from the OSRS Wiki DPS calculator engine with the player's live levels and prayers.
+
+Returns up to 3 setups per style: the 3 best overall. Setups with the same DPS count once (the one with the fewest swaps is shown), so two entries can use the same weapon. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
+
+Examples:
+  - "Best setup I own vs Maggot King Far?" -> {monster: "Maggot King", monster_version: "Far"}
+  - "Best ranged setup I own for Vorkath?" -> {monster: "Vorkath", monster_version: "Post-quest", style: "ranged"}
+  - "And after 2 DWH specs?" -> {monster: "Maggot King", monster_version: "Nearby", defence_reductions: {dwh_hits: 2}}
+Use osrs_search_monsters for the exact monster_version. Prefer monster + monster_version to monster_id: the phases of one boss can share an id.`,
+    inputSchema: z.strictObject({
+      ...monsterFields,
+      style: z.enum(['melee', 'ranged', 'magic']).optional().describe('One combat style. Omit to rank all three.'),
+      response_format: responseFormat,
+    }),
+    annotations: READ_ONLY,
+  }, async (a) => {
+    const state = await readState(bridgeFile(), join(dirname(bridgeFile()), 'bank.json'));
+    let monster;
+    if (a.monster_id !== undefined) monster = { id: a.monster_id };
+    else if (a.monster) monster = { name: a.monster, version: a.monster_version };
+    else if (state.target) monster = state.target;
+    else throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Maggot King") and `monster_version`.');
+
+    const plan = planBankMode(state, { monster, style: a.style, drains: toReductions(a.defence_reductions) });
+    const label = `${plan.monster.name}${plan.monster.version ? ` (${plan.monster.version})` : ''}`;
+    return reply(a.response_format, { ...plan }, () => [
+      `# Best owned setups vs ${label}`,
+      plan.bankAgeMs === null ? 'Bank: no snapshot yet.' : `Bank snapshot: ${mdAge(plan.bankAgeMs)} old.`,
+      ...Object.entries(plan.styles).flatMap(([style, stylePlan]) => [
+        '',
+        `## ${style[0].toUpperCase()}${style.slice(1)}`,
+        'unavailable' in stylePlan ? `Unavailable: ${stylePlan.unavailable}` : stylePlan.setups.map((s, i) => mdSetup(s, i + 1)).join('\n'),
+      ]),
+    ].join('\n') + mdNotes(plan.notes));
   });
 
   server.registerTool('osrs_search_monsters', {
