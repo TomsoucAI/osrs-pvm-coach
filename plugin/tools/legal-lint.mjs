@@ -23,6 +23,7 @@ const RED = [
   [/\b(defineClass|URLClassLoader)\b/, 'Dynamic class loading. Rule: no downloading/loading code at runtime'],
   [/\b(ObjectInputStream|ObjectOutputStream)\b/, 'Java serialization. Rule: forbidden language feature'],
   [/\b(HttpServer|ServerSocket|WebSocketServer)\b/, 'Serves data over the network. Rule: no exposing player information over HTTP'],
+  [/\bThread\s*\.\s*sleep\b/, 'Blocks the thread (Thread.sleep). Rule: never use Thread.sleep()'],
 ];
 
 const AMBER = [
