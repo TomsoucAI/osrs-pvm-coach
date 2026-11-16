@@ -3,6 +3,8 @@
     "deny": [
       "Read(~/.runelite/credentials.properties)",
       "Edit(~/.runelite/credentials.properties)",
+      "Read(~/.runelite/jagex-accounts.dat)",
+      "Edit(~/.runelite/jagex-accounts.dat)",
       "Bash(cmdkey:*)"
     ]
   },
