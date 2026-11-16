@@ -6,7 +6,7 @@ Research date: 2026-11-16. Sources are primary (RuneLite org repos and wiki, Jag
 
 1. Keep the current design: the plugin writes a local JSON file through `Filepath`, and the MCP server reads the file. Do not add an HTTP or WebSocket server inside the plugin.
 2. **Feature 1 (own inventory, bank snapshot, rune pouch, spellbook to a local file): GREEN.** No rule forbids it. Precedent on the Plugin Hub: Bank Memory, Inventory Setups, Data Export, CA Export (writes JSON to `.runelite`).
-3. **Feature 1 over HTTP: RED.** "No exposing player information over HTTP" is in the Rejected Features page and in example-plugin `AGENTS.md`. WikiSync's loopback WebSocket is a reviewed exception, not a pattern to copy.
+3. **Feature 1 over HTTP: RED.** "No exposing player information over HTTP" is in the Rejected Features page and in example-plugin `AGENTS.md`. A loopback WebSocket with a fixed origin allowlist is AMBER, not RED: WikiSync and Bank Bridge both passed Hub review with one (2026-11-16, [bank-bridge-plugin.md](bank-bridge-plugin.md)). We still do not need one.
 4. **Feature 2 (count your own landed DWH / Elder maul / BGS specs, compute target defence): GREEN.** Core plugin "Special Attack Counter" already does this and shows a defence-drain infobox. Hub plugin "Party Defence Tracker" does it with party data.
 5. **Feature 2 AMBER edge:** do not turn the result into automatic in-fight prompts (what to pray, where to stand, when the boss attacks next). Those are banned boss-fight features. "No attack counters" in the rules means counting the boss's attacks, not your own specs (interpretation; the rule text does not define it).
 6. API: bank = `InventoryID.BANK`, inventory = `InventoryID.INV`, gear = `InventoryID.WORN` (all `net.runelite.api.gameval`). Rune pouch = `VarbitID.RUNE_POUCH_TYPE_1..6` and `VarbitID.RUNE_POUCH_QUANTITY_1..6` with `EnumID.RUNEPOUCH_RUNE`. Spellbook = `VarbitID.SPELLBOOK` (0 standard, 1 ancient, 2 lunar, 3 arceuus).
@@ -75,7 +75,8 @@ Research date: 2026-11-16. Sources are primary (RuneLite org repos and wiki, Jag
 |---|---|---|
 | Read own inventory, bank, rune pouch, spellbook | GREEN | No rule forbids reading your own state. Core and hub plugins do it (section 3). |
 | Write own data to a local file via `Filepath` | GREEN | Required I/O path per `AGENTS.md`. CA Export writes JSON to `.runelite`. |
-| Serve own data over HTTP/WebSocket from the plugin | RED | Rejected Features + `AGENTS.md` Data & Privacy. |
+| Serve own data over HTTP from the plugin | RED | Rejected Features + `AGENTS.md` Data & Privacy. |
+| Serve own data over a loopback WebSocket with a fixed origin allowlist | AMBER | WikiSync (2024-03-19) and Bank Bridge (2026-08-25) passed Hub review; the HTTP rule still stands. See [bank-bridge-plugin.md](bank-bridge-plugin.md) section 6. |
 | Send data to any remote server | AMBER | Allowed with warning and off-by-default config, but extra review. Not needed here. |
 | Count own landed specs, compute target defence | GREEN | Core Special Attack Counter does exactly this, with a defence-drain infobox. |
 | Show automatic in-fight advice from that number | AMBER/RED | Can drift into banned boss-fight indicators or "content simulation". Keep DPS output out of the game overlay; keep it in the MCP side, used between fights. |
