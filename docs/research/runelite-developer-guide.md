@@ -6,7 +6,7 @@ Companion note: `runelite-plugin-practice.md` (legality, precedent, Plugin Hub).
 ## Bottom line
 
 1. The wiki is a **map, not a manual**. It covers setup, dev flags, vars, logging, code style and the forbidden-API list. It does **not** cover the client thread, events by name, ItemManager, gameval, enums or structs.
-2. For everything the wiki skips, the ground truth is, in order: the API/client **Javadoc**, **core plugin sources** in `runelite/runelite`, and the first-party `runelite-plugin/AGENTS.md` (from `runelite/example-plugin`). Context7 indexes `/runelite/runelite`.
+2. For everything the wiki skips, the ground truth is, in order: the API/client **Javadoc**, **core plugin sources** in `runelite/runelite`, and the first-party `plugin/AGENTS.md` (from `runelite/example-plugin`). Context7 indexes `/runelite/runelite`.
 3. The wiki says to learn from **core** plugins, not hub plugins: hub plugins' "API usage is not always correct". Core plugins to read for our next features: `specialcounter` (own spec hits), `runepouch`, `bank`, `attackstyles`, `opponentinfo`, `itemstats`.
 
 ## What the guide gives us

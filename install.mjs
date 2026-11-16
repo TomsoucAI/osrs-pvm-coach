@@ -14,7 +14,7 @@ const DRY = process.argv.includes('--dry-run');
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const HOME = homedir();
 const WIN = platform() === 'win32';
-const MCP_ENTRY = resolve(ROOT, 'mcp-server', 'dist', 'index.js');
+const MCP_ENTRY = resolve(ROOT, 'app', 'dist', 'index.js');
 
 const ok = (m) => console.log(`  ✓ ${m}`);
 const warn = (m) => console.log(`  ! ${m}`);
@@ -52,10 +52,10 @@ if (!existsSync(MCP_ENTRY)) throw new Error(`Missing ${MCP_ENTRY}. Run this from
 ok('MCP bundle found');
 
 // ── 2. Plugin-dev rules ──────────────────────────────────────
-// Claude Code reads runelite-plugin/AGENTS.md (RuneLite's official agent guide) when you work in that folder.
+// Claude Code reads plugin/AGENTS.md (RuneLite's official agent guide) when you work in that folder.
 // No third-party skills or MCP servers are installed.
 step('Plugin-dev rules');
-ok('runelite-plugin/AGENTS.md (official RuneLite guide) is loaded automatically by Claude Code');
+ok('plugin/AGENTS.md (official RuneLite guide) is loaded automatically by Claude Code');
 
 // ── 3. Claude Code ───────────────────────────────────────────────
 step('Claude Code');
@@ -98,9 +98,9 @@ if (!desktopCfg) {
 
 // ── 5. Quick self-test ───────────────────────────────────────────
 step('Self-test (no game needed)');
-const st = run('node', [resolve(ROOT, 'mcp-server', 'dist', 'selftest.js')], { allowFail: true });
+const st = run('node', [resolve(ROOT, 'app', 'dist', 'selftest.js')], { allowFail: true });
 DRY || (st.status === 0 ? ok('DPS engine tests pass') : warn(`self-test failed:\n${st.stdout}`));
 
 console.log(`
 Done. Next: test the plugin → see TESTING.md
-  cd runelite-plugin && ${WIN ? 'gradlew.bat' : './gradlew'} run`);
+  cd plugin && ${WIN ? 'gradlew.bat' : './gradlew'} run`);

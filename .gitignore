@@ -1,4 +1,4 @@
 node_modules/
 vendor/
-runelite-plugin/build/
-runelite-plugin/.gradle/
+plugin/build/
+plugin/.gradle/
