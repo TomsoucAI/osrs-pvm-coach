@@ -1,6 +1,8 @@
 {
-  "about": "Six reference setups for the ironman-v2 fixture. engineDps is what this repo computes. wikiDps is what Tom reads in the official Wiki DPS calculator for the same setup (Owner verifies, issue #5); null = not entered yet.",
+  "about": "Six reference setups for the ironman-v2 fixture. engineDps is what this repo computes. wikiDps is the value from the official Wiki DPS calculator for the same setup (Owner verifies, issue #5); null = not entered yet.",
   "player": "Levels: Attack 90, Strength 92, Defence 85, Ranged 92, Magic 90, Prayer 77, Hitpoints 93. No potion boost, no prayer, not on a slayer task.",
+  "wikiSource": "tools.runescape.wiki/osrs-dps, read on 2026-11-16. A Claude session filled the calculator at Tom's request; items were entered by name in the page's search box.",
+  "wikiAssumptions": "kandarinDiary: false and onSlayerTask: false. The Wiki page turns both ON by default (row 1 then reads 5.155); both were turned OFF. Row 6: Defensive Reductions, Dragon warhammer hits = 2.",
   "references": [
     {
       "label": "Far ranged",
@@ -14,7 +16,7 @@
         "hands": "Barrows gloves", "feet": "Snakeskin boots", "ring": "Archers ring (i)"
       },
       "engineDps": 4.344,
-      "wikiDps": null
+      "wikiDps": 4.344
     },
     {
       "label": "Far magic",
@@ -28,7 +30,7 @@
         "hands": "Barrows gloves", "feet": "Infinity boots", "ring": "Seers ring (i)"
       },
       "engineDps": 3.334,
-      "wikiDps": null
+      "wikiDps": 3.334
     },
     {
       "label": "Nearby melee",
@@ -42,7 +44,7 @@
         "hands": "Barrows gloves", "feet": "Dragon boots", "ring": "Berserker ring (i)"
       },
       "engineDps": 1.963,
-      "wikiDps": null
+      "wikiDps": 1.963
     },
     {
       "label": "Nearby ranged",
@@ -56,7 +58,7 @@
         "hands": "Barrows gloves", "feet": "Snakeskin boots", "ring": "Archers ring (i)"
       },
       "engineDps": 4.344,
-      "wikiDps": null
+      "wikiDps": 4.344
     },
     {
       "label": "Nearby magic",
@@ -70,7 +72,7 @@
         "hands": "Barrows gloves", "feet": "Infinity boots", "ring": "Seers ring (i)"
       },
       "engineDps": 0.669,
-      "wikiDps": null
+      "wikiDps": 0.669
     },
     {
       "label": "Nearby melee, 2 Dragon warhammer hits",
@@ -85,7 +87,7 @@
         "hands": "Barrows gloves", "feet": "Dragon boots", "ring": "Berserker ring (i)"
       },
       "engineDps": 3.5,
-      "wikiDps": null
+      "wikiDps": 3.5
     }
   ]
 }
