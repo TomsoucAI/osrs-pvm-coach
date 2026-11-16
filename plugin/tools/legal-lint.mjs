@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Legality linter for RuneLite plugins. Pattern checks only: it catches risky CODE, the
-// osrs-legality-gate skill judges FEATURES. Rules mirror AGENTS.md "Plugin Rules & Restrictions".
+// osrs-legality-gate skill judges FEATURES. Rules mirror AGENTS.md "Plugin Rules & Restrictions"
+// and "Threading & Concurrency".
 //
 //   node tools/legal-lint.mjs [dir]   scan (default src/main/java); exit 1 on RED
 //   node tools/legal-lint.mjs --hook  Claude Code PostToolUse hook; exit 2 sends findings to Claude
