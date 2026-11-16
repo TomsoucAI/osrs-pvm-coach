@@ -228,13 +228,14 @@ public class DpsBridgePlugin extends Plugin
 		{
 			int type = client.getVarbitValue(RUNE_POUCH_TYPES[i]);
 			int quantity = client.getVarbitValue(RUNE_POUCH_QUANTITIES[i]);
-			if (type == 0 || quantity == 0)
+			int runeItemId = runes.getIntValue(type);
+			if (type == 0 || quantity == 0 || runeItemId <= 0)
 			{
-				continue; // empty pouch slot
+				continue; // empty pouch slot, or a rune type that the enum does not map to an item
 			}
 
 			JsonObject o = new JsonObject();
-			o.addProperty("runeItemId", runes.getIntValue(type));
+			o.addProperty("runeItemId", runeItemId);
 			o.addProperty("quantity", quantity);
 			a.add(o);
 		}

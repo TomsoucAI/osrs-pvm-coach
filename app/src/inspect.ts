@@ -26,7 +26,7 @@ const itemStack = z.object({ id: z.number().int(), quantity: z.number().int() })
 const v2Fields = z.object({
   inventory: z.array(itemStack).optional(),
   runePouch: z.array(z.object({ runeItemId: z.number().int(), quantity: z.number().int() })).optional(),
-  spellbook: z.string().nullable().optional(),
+  spellbook: z.enum(['standard', 'ancient', 'lunar', 'arceuus']).nullable().optional(),
 });
 const bankFileSchema = z.object({ timestamp: z.number(), items: z.array(itemStack) });
 const BANK_FILE_NAME = 'bank.json';
