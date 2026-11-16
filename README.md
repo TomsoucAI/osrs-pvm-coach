@@ -110,7 +110,8 @@ No tool guarantees anything: the Plugin Hub review is the strongest check there 
 ## Account safety
 
 - Nothing here asks for, reads or stores your password. The MCP makes no internet requests; it reads a local file (or WikiSync on localhost). The plugin writes gear/levels/prayers/target only.
-- Dev client login goes through Jagex's own login window; the session is kept in Windows Credential Manager / macOS Keychain, not in a file.
-- If you ever created `~/.runelite/credentials.properties` (old method), delete it. Claude Code is blocked from reading it in the repo-root `.claude/settings.json`.
+- Dev client login goes through Jagex's own login window. The session is stored encrypted in `~/.runelite/jagex-accounts.dat`; the key is in Windows Credential Manager / macOS Keychain. No password is stored.
+- If you ever created `~/.runelite/credentials.properties` (old method), delete it.
+- The repo-root `.claude/settings.json` denies Claude Code's `Read` and `Edit` of `credentials.properties` and `jagex-accounts.dat`. This also blocks Bash commands that name the file (`cat`, `head`, redirections). **Residual risk:** it does not block a command that reads the file without naming it (`grep -r`) or a subprocess (`node -e`, `sh -c`). Only the Claude Code sandbox closes that gap, and it does not run on native Windows (WSL2 only). A read gives an encrypted session, not your password. Accepted for now; see #30.
 - `install.mjs` installs no third-party skills or MCP servers. Don't add other people's MCP servers, skills or "RuneLite" downloads without reading them: they run with your user's permissions.
 - Turn on 2-step authentication on your Jagex account.
