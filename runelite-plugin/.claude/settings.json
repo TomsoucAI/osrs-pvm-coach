@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.runelite/credentials.properties)",
+      "Edit(~/.runelite/credentials.properties)",
+      "Bash(cmdkey:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/tools/legal-lint.mjs\" --hook" }
+        ]
+      }
+    ]
+  }
+}

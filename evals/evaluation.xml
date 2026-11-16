@@ -1,0 +1,44 @@
+<evaluation>
+  <!-- Run against the fixed sample state so answers are stable:
+       DPS_BRIDGE_FILE=examples/state.sample.json, calculator pinned at commit 74958b1. -->
+  <qa_pair>
+    <question>Against Vorkath in its post-quest version, how much DPS would the player lose by turning off their active offensive prayer? Answer with the difference rounded to 2 decimals.</question>
+    <answer>1.10</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Against the monster the player is currently fighting, compare their current weapon with an Abyssal tentacle, a Dragon scimitar and an Abyssal bludgeon (two-handed, so no shield). Which weapon gives the highest DPS? Answer with the weapon name only.</question>
+    <answer>Abyssal tentacle</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Vorkath exists in two versions in the calculator data. What is the NPC id of the version with more hitpoints?</question>
+    <answer>8059</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Against post-quest Vorkath, the player wonders which melee prayer setup is best: Piety, Chivalry, or Ultimate Strength combined with Incredible Reflexes. What is the DPS of the best option, as reported by the calculator (3 decimals)?</question>
+    <answer>3.698</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>If the player had only drunk a Super attack potion (no strength boost) instead of their current boosts, what would their max hit be against an Abyssal demon with their current prayers?</question>
+    <answer>40</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What is the defence level of the monster the player is currently fighting?</question>
+    <answer>135</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Against the player's current target, by how many percentage points does accuracy change if they switch from their current whip style to Flick? Answer rounded to 2 decimals, positive if accuracy goes up.</question>
+    <answer>0.27</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many monster entries (all versions counted separately) in the calculator data have "dragon" in their name?</question>
+    <answer>62</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>With no prayers active and no potion boosts at all, what would the player's max hit be against an Abyssal demon in their current gear and style?</question>
+    <answer>33</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>On a slayer task, if the player wielded an Abyssal tentacle and wore a Slayer helmet (i), keeping everything else the same, what would their average time to kill an Abyssal demon be, in whole seconds?</question>
+    <answer>18</answer>
+  </qa_pair>
+</evaluation>
