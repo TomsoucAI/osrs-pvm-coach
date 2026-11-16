@@ -52,5 +52,4 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      # gradlew is committed without the executable bit, so run it through sh.
-      - run: sh ./gradlew build
+      - run: ./gradlew build

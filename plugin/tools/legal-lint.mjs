@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Legality linter for RuneLite plugins. Pattern checks only: it catches risky CODE, the
-// osrs-legality-gate skill judges FEATURES. Rules mirror AGENTS.md "Plugin Rules & Restrictions".
+// osrs-legality-gate skill judges FEATURES. Rules mirror AGENTS.md "Plugin Rules & Restrictions"
+// and "Threading & Concurrency".
 //
 //   node tools/legal-lint.mjs [dir]   scan (default src/main/java); exit 1 on RED
 //   node tools/legal-lint.mjs --hook  Claude Code PostToolUse hook; exit 2 sends findings to Claude
@@ -23,6 +24,7 @@ const RED = [
   [/\b(defineClass|URLClassLoader)\b/, 'Dynamic class loading. Rule: no downloading/loading code at runtime'],
   [/\b(ObjectInputStream|ObjectOutputStream)\b/, 'Java serialization. Rule: forbidden language feature'],
   [/\b(HttpServer|ServerSocket|WebSocketServer)\b/, 'Serves data over the network. Rule: no exposing player information over HTTP'],
+  [/\bThread\s*\.\s*sleep\b/, 'Blocks the thread (Thread.sleep). Rule: never use Thread.sleep()'],
 ];
 
 const AMBER = [
