@@ -1,0 +1,75 @@
+{
+  "version": 2,
+  "loggedIn": true,
+  "playerName": "FixtureIron",
+  "equipment": {
+    "head": 10828,
+    "cape": 6570,
+    "neck": 6585,
+    "weapon": 4151,
+    "body": 10551,
+    "shield": 12954,
+    "legs": 4087,
+    "hands": 7462,
+    "feet": 11840,
+    "ring": 11773,
+    "ammo": null
+  },
+  "realLevels": {
+    "atk": 90,
+    "str": 92,
+    "def": 85,
+    "ranged": 92,
+    "magic": 90,
+    "prayer": 77,
+    "hp": 93,
+    "mining": 70,
+    "herblore": 80,
+    "farming": 75
+  },
+  "boostedLevels": {
+    "atk": 90,
+    "str": 92,
+    "def": 85,
+    "ranged": 92,
+    "magic": 90,
+    "prayer": 77,
+    "hp": 93,
+    "mining": 70,
+    "herblore": 80,
+    "farming": 75
+  },
+  "prayers": [],
+  "attackStyleIndex": 1,
+  "castingMode": 0,
+  "weaponCategory": 20,
+  "styleSlots": [
+    "Flick",
+    "Lash",
+    "Other",
+    "Deflect"
+  ],
+  "buffs": {
+    "onSlayerTask": false,
+    "inWilderness": false,
+    "kandarinDiary": false,
+    "chargeSpell": false
+  },
+  "target": null,
+  "inventory": [
+    { "id": 13576, "quantity": 1 },
+    { "id": 9185, "quantity": 1 },
+    { "id": 9243, "quantity": 200 },
+    { "id": 12791, "quantity": 1 },
+    { "id": 385, "quantity": 10 },
+    { "id": 2434, "quantity": 2 },
+    { "id": 12695, "quantity": 1 }
+  ],
+  "runePouch": [
+    { "runeItemId": 554, "quantity": 5000 },
+    { "runeItemId": 560, "quantity": 3000 },
+    { "runeItemId": 556, "quantity": 5000 }
+  ],
+  "spellbook": "standard",
+  "timestamp": 1794791879541
+}

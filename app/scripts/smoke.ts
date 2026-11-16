@@ -8,20 +8,25 @@ import { resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
-const client = new Client({ name: 'smoke-test', version: '1.0.0' });
-await client.connect(new StdioClientTransport({
-  command: 'node',
-  args: ['dist/index.js'],
-  env: { ...getDefaultEnvironment(), DPS_BRIDGE_FILE: resolve('../examples/state.sample.json') },
-}));
+async function connect(stateFile: string) {
+  const c = new Client({ name: 'smoke-test', version: '1.0.0' });
+  await c.connect(new StdioClientTransport({
+    command: 'node',
+    args: ['dist/index.js'],
+    env: { ...getDefaultEnvironment(), DPS_BRIDGE_FILE: resolve(stateFile) },
+  }));
+  return c;
+}
+
+const client = await connect('../examples/state.sample.json');
 
 const { tools } = await client.listTools();
 assert.deepEqual(tools.map((t) => t.name).sort(),
-  ['osrs_calculate_dps', 'osrs_compare_setups', 'osrs_get_loadout', 'osrs_search_monsters']);
+  ['osrs_best_owned_setup', 'osrs_calculate_dps', 'osrs_compare_setups', 'osrs_get_loadout', 'osrs_search_monsters']);
 for (const t of tools) assert.equal(t.annotations?.readOnlyHint, true, `${t.name} should be read-only`);
 
-const call = async (name: string, args: Record<string, unknown>) => {
-  const r = await client.callTool({ name, arguments: args });
+const call = async (name: string, args: Record<string, unknown>, on: Client = client) => {
+  const r = await on.callTool({ name, arguments: args });
   assert.ok(!r.isError, `${name} failed: ${JSON.stringify(r.content)}`);
   return r;
 };
@@ -69,5 +74,38 @@ const badPrayer = await client.callTool({ name: 'osrs_calculate_dps', arguments:
 assert.equal(badPrayer.isError, true, 'unknown prayer should be a readable tool error');
 assert.match((badPrayer.content[0] as { text: string }).text, /Valid:/);
 
+// osrs_best_owned_setup on the v1 sample (no bank file): ranks the worn gear against the current target
+type Plan = {
+  monster: { name: string; version: string };
+  styles: Record<string, { unavailable?: string; setups?: { dps: number; items: Record<string, { name: string; source: string } | null>; swaps: unknown[] }[] }>;
+  bankAgeMs: number | null;
+};
+const wornOnly = (await call('osrs_best_owned_setup', { style: 'melee', response_format: 'json' })).structuredContent as Plan;
+assert.equal(wornOnly.monster.name, 'Abyssal demon');
+assert.equal(wornOnly.bankAgeMs, null);
+assert.equal(wornOnly.styles.melee.setups?.[0].items.weapon?.name, 'Abyssal whip');
 await client.close();
+
+// osrs_best_owned_setup on the v2 fixture with its bank: Maggot King Far has no melee, ranged comes from the bank
+const fixture = await connect('fixtures/ironman-v2/state.json');
+const far = (await call('osrs_best_owned_setup', { monster: 'Maggot King', monster_version: 'Far', response_format: 'json' }, fixture))
+  .structuredContent as Plan;
+assert.equal(far.monster.version, 'Far');
+assert.ok(far.styles.melee.unavailable, 'melee should be unavailable in the Far phase');
+const ranged = far.styles.ranged.setups![0];
+assert.equal(ranged.dps, 4.344);
+assert.deepEqual(ranged.items.weapon, { id: 9185, name: 'Rune crossbow', source: 'inventory' });
+assert.equal(ranged.items.ammo?.source, 'bank');
+assert.ok(far.styles.magic.setups!.length > 0);
+
+const farMd = await call('osrs_best_owned_setup', { monster: 'Maggot King', monster_version: 'Far' }, fixture);
+const farText = (farMd.content[0] as { text: string }).text;
+assert.match(farText, /# Best owned setups vs Maggot King \(Far\)/);
+assert.match(farText, /## Melee\nUnavailable:/);
+assert.match(farText, /Rune crossbow \[inventory\]/);
+
+const badStyle = await fixture.callTool({ name: 'osrs_best_owned_setup', arguments: { monster: 'Maggot King', style: 'summoning' } });
+assert.equal(badStyle.isError, true, 'an unknown style should be rejected by the schema');
+await fixture.close();
+
 console.error('Smoke test passed');

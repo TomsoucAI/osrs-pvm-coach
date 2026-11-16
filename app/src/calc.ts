@@ -20,7 +20,7 @@ import type { PlayerCombatStyle } from '@/types/PlayerCombatStyle';
 import type { Snapshot, SkillMap } from './snapshot';
 
 const SKILLS: (keyof PlayerSkills)[] = ['atk', 'str', 'def', 'ranged', 'magic', 'prayer', 'hp', 'mining', 'herblore', 'farming'];
-const SLOTS: (keyof PlayerEquipment)[] = ['head', 'cape', 'neck', 'ammo', 'weapon', 'body', 'shield', 'legs', 'hands', 'feet', 'ring'];
+export const SLOTS: (keyof PlayerEquipment)[] = ['head', 'cape', 'neck', 'ammo', 'weapon', 'body', 'shield', 'legs', 'hands', 'feet', 'ring'];
 
 const monsters = getMonsters();
 const equipmentById = new Map<number, EquipmentPiece>(availableEquipment.map((e) => [e.id, e]));

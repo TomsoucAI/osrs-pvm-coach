@@ -5895,6 +5895,34 @@ function formatError(error2, mapper = (issue2) => issue2.message) {
   processError(error2);
   return fieldErrors;
 }
+function toDotPath(_path) {
+  const segs = [];
+  const path = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path) {
+    if (typeof seg === "number")
+      segs.push(`[${seg}]`);
+    else if (typeof seg === "symbol")
+      segs.push(`[${JSON.stringify(String(seg))}]`);
+    else if (/[^\w$]/.test(seg))
+      segs.push(`[${JSON.stringify(seg)}]`);
+    else {
+      if (segs.length)
+        segs.push(".");
+      segs.push(seg);
+    }
+  }
+  return segs.join("");
+}
+function prettifyError(error2) {
+  const lines = [];
+  const issues = [...error2.issues].sort((a, b) => (a.path ?? []).length - (b.path ?? []).length);
+  for (const issue2 of issues) {
+    lines.push(`\u2716 ${issue2.message}`);
+    if (issue2.path?.length)
+      lines.push(`  \u2192 at ${toDotPath(issue2.path)}`);
+  }
+  return lines.join("\n");
+}
 
 // node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
@@ -11318,6 +11346,15 @@ function record(keyType, valueType, params) {
     keyType,
     valueType,
     ...util_exports.normalizeParams(params)
+  });
+}
+function partialRecord(keyType, valueType, params) {
+  return new ZodRecord({
+    type: "record",
+    keyType,
+    valueType,
+    ...util_exports.normalizeParams(params),
+    partial: true
   });
 }
 var ZodEnum = /* @__PURE__ */ $constructor("ZodEnum", (inst, def) => {
@@ -330752,7 +330789,631 @@ async function getSnapshot() {
   );
 }
 
+// src/core/engineNamedItems.json
+var engineNamedItems_default = [
+  "Adamant arrow",
+  "Adamant bolts",
+  "Adamant brutal",
+  "Adamant fire arrow",
+  "Ahrim's hood",
+  "Ahrim's robeskirt",
+  "Ahrim's robetop",
+  "Amethyst arrow",
+  "Amethyst broad bolts",
+  "Amethyst fire arrow",
+  "Amulet of air",
+  "Amulet of avarice",
+  "Amulet of earth",
+  "Amulet of fire",
+  "Amulet of the Damned",
+  "Amulet of water",
+  "Ascension bolts",
+  "Atlatl dart",
+  "Barbed arrow",
+  "Barbed bolts",
+  "Barrows gloves",
+  "Barrows gloves (wrapped)",
+  "Berserker necklace",
+  "Berserker necklace (or)",
+  "Black brutal",
+  "Black mask",
+  "Black mask (i)",
+  "Blessed Dizana's quiver",
+  "Blood Moon chestplate",
+  "Blood Moon helm",
+  "Blood Moon tassets",
+  "Blue Moon chestplate",
+  "Blue Moon helm",
+  "Blue Moon tassets",
+  "Blunt arrow",
+  "Blurite bolts",
+  "Bone bolts",
+  "Bracelet of ethereum",
+  "Bracelet of slaughter",
+  "Brimstone ring",
+  "Broad arrows",
+  "Broad bolts",
+  "Bronze arrow",
+  "Bronze bolts",
+  "Bronze brutal",
+  "Bronze fire arrow",
+  "Bug lantern",
+  "Bullet arrow",
+  "Castle wars arrow",
+  "Castle wars bolts",
+  "Castle wars bracelet",
+  "Chaos gauntlets",
+  "Confliction gauntlets",
+  "Crystal blessing",
+  "Crystal body",
+  "Crystal helm",
+  "Crystal legs",
+  "Dharok's helm",
+  "Dharok's platebody",
+  "Dharok's platelegs",
+  "Diamond ascension bolts",
+  "Diamond ascension bolts (e)",
+  "Diamond bolts",
+  "Diamond bolts (e)",
+  "Diamond dragon bolts",
+  "Diamond dragon bolts (e)",
+  "Dizana's max cape",
+  "Dizana's quiver",
+  "Dragon arrow",
+  "Dragon bolts",
+  "Dragon fire arrow",
+  "Dragonstone bolts",
+  "Dragonstone bolts (e)",
+  "Dragonstone dragon bolts",
+  "Dragonstone dragon bolts (e)",
+  "Earmuffs",
+  "Echo boots",
+  "Eclipse Moon chestplate",
+  "Eclipse Moon helm",
+  "Eclipse Moon tassets",
+  "Efaritay's aid",
+  "Elemental amulet",
+  "Elite void robe",
+  "Elite void robe (or)",
+  "Elite void top",
+  "Elite void top (or)",
+  "Elysian spirit shield",
+  "Emerald bolts",
+  "Emerald bolts (e)",
+  "Emerald dragon bolts",
+  "Emerald dragon bolts (e)",
+  "Expeditious bracelet",
+  "Facemask",
+  "Field arrow",
+  "Guthix cape",
+  "Guthix max cape",
+  "Ice arrows",
+  "Imbued Guthix cape",
+  "Imbued Guthix max cape",
+  "Imbued Saradomin cape",
+  "Imbued Saradomin max cape",
+  "Imbued Zamorak cape",
+  "Imbued Zamorak max cape",
+  "Inoculation bracelet",
+  "Inquisitor's great helm",
+  "Inquisitor's hauberk",
+  "Inquisitor's plateskirt",
+  "Iron arrow",
+  "Iron bolts",
+  "Iron brutal",
+  "Iron fire arrow",
+  "Jade bolts",
+  "Jade bolts (e)",
+  "Jade dragon bolts",
+  "Jade dragon bolts (e)",
+  "Justiciar chestguard",
+  "Justiciar faceguard",
+  "Justiciar legguards",
+  "Karil's coif",
+  "Karil's leatherskirt",
+  "Karil's leathertop",
+  "Kebbit bolts",
+  "Lightbearer",
+  "Long kebbit bolts",
+  "Mithril arrow",
+  "Mithril bolts",
+  "Mithril brutal",
+  "Mithril fire arrow",
+  "Moonlight antler bolts",
+  "Neitiznot shield",
+  "Nose peg",
+  "Obsidian helmet",
+  "Obsidian platebody",
+  "Obsidian platelegs",
+  "Ogre arrow",
+  "Onyx ascension bolts",
+  "Onyx ascension bolts (e)",
+  "Onyx bolts",
+  "Onyx bolts (e)",
+  "Onyx dragon bolts",
+  "Onyx dragon bolts (e)",
+  "Opal bolts",
+  "Opal bolts (e)",
+  "Opal dragon bolts",
+  "Opal dragon bolts (e)",
+  "Pearl bolts",
+  "Pearl bolts (e)",
+  "Pearl dragon bolts",
+  "Pearl dragon bolts (e)",
+  "Phoenix necklace",
+  "Reinforced goggles",
+  "Ring of recoil",
+  "Ring of suffering",
+  "Ring of suffering (i)",
+  "Rondache",
+  "Ruby bolts",
+  "Ruby bolts (e)",
+  "Ruby dragon bolts",
+  "Ruby dragon bolts (e)",
+  "Rune arrow",
+  "Rune brutal",
+  "Rune fire arrow",
+  "Runite bolts",
+  "Salve amulet",
+  "Salve amulet (e)",
+  "Salve amulet(ei)",
+  "Salve amulet(i)",
+  "Sapphire bolts",
+  "Sapphire bolts (e)",
+  "Sapphire dragon bolts",
+  "Sapphire dragon bolts (e)",
+  "Saradomin cape",
+  "Saradomin max cape",
+  "Seeking adamant arrow",
+  "Seeking amethyst arrow",
+  "Seeking broad arrows",
+  "Seeking bronze arrow",
+  "Seeking dragon arrow",
+  "Seeking iron arrow",
+  "Seeking mithril arrow",
+  "Seeking rune arrow",
+  "Seeking steel arrow",
+  "Silver bolts",
+  "Slayer helmet",
+  "Slayer helmet (i)",
+  "Spiny helmet",
+  "Steel arrow",
+  "Steel bolts",
+  "Steel brutal",
+  "Steel fire arrow",
+  "Sunlight antler bolts",
+  "Tome of Earth",
+  "Tome of Fire",
+  "Tome of Water",
+  "Topaz bolts",
+  "Topaz bolts (e)",
+  "Topaz dragon bolts",
+  "Topaz dragon bolts (e)",
+  "Torag's helm",
+  "Torag's platebody",
+  "Torag's platelegs",
+  "Training arrows",
+  "V's helm",
+  "Verac's brassard",
+  "Verac's helm",
+  "Verac's plateskirt",
+  "Virtus mask",
+  "Virtus robe bottom",
+  "Virtus robe top",
+  "Void knight gloves",
+  "Void knight robe",
+  "Void knight robe (or)",
+  "Void knight top",
+  "Void knight top (or)",
+  "Void mage helm",
+  "Void mage helm (or)",
+  "Void melee helm",
+  "Void melee helm (or)",
+  "Void ranger helm",
+  "Void ranger helm (or)",
+  "Zamorak cape",
+  "Zamorak max cape"
+];
+
+// src/core/phaseRules.ts
+var PHASE_RULES = [
+  // Spec #1, grill decision Q8: in the "Far" phase the Maggot King is out of melee reach.
+  {
+    monster: "Maggot King",
+    version: "Far",
+    style: "melee",
+    reason: "Melee cannot reach the Maggot King in its Far phase."
+  }
+];
+function phaseUnavailable(monster, style) {
+  const rule = PHASE_RULES.find((r) => r.monster === monster.name && r.version === (monster.version ?? "") && r.style === style);
+  return rule?.reason ?? null;
+}
+
+// src/core/bankMode.ts
+var COMBAT_STYLES = ["melee", "ranged", "magic"];
+var SETUPS_PER_STYLE = 3;
+var OTHER_SLOTS = SLOTS.filter((s) => s !== "weapon");
+var ENGINE_NAMED = new Set(engineNamedItems_default);
+var BLOCKING_ISSUES = /* @__PURE__ */ new Set([
+  UserIssueType_default.EQUIPMENT_MISSING_AMMO,
+  UserIssueType_default.EQUIPMENT_WRONG_AMMO,
+  UserIssueType_default.SPELL_WRONG_WEAPON,
+  UserIssueType_default.SPELL_WRONG_MONSTER,
+  UserIssueType_default.WEAPON_WRONG_MONSTER
+]);
+function collectOwned(state) {
+  const pool = Object.fromEntries(SLOTS.map((s) => [s, []]));
+  const worn = Object.fromEntries(SLOTS.map((s) => [s, null]));
+  const unknownWorn = [];
+  let notEquipment = 0;
+  const add = (id, source) => {
+    const item = findItem(id);
+    if (!item) return null;
+    const canon = getCanonicalItem(item);
+    const known = pool[item.slot].find((o) => o.canon.id === canon.id);
+    if (known) return known;
+    const owned = {
+      ownedId: id,
+      item,
+      canon,
+      source
+    };
+    pool[item.slot].push(owned);
+    return owned;
+  };
+  for (const slot of SLOTS) {
+    const id = state.equipment?.[slot];
+    if (id === null || id === void 0) continue;
+    const owned = add(id, "worn");
+    if (owned) worn[slot] = owned;
+    else unknownWorn.push(`Worn item ${id} (${slot}) isn't in the Wiki calculator's data (cosmetic or very new item); ignored.`);
+  }
+  const stacks = [[state.inventory, "inventory"], [state.bank?.items ?? [], "bank"]];
+  for (const [items, source] of stacks) {
+    for (const { id, quantity } of items) {
+      if (quantity > 0 && !add(id, source)) notEquipment++;
+    }
+  }
+  return {
+    pool,
+    worn,
+    unknownWorn,
+    notEquipment
+  };
+}
+function combatStyleOf(style) {
+  if (style.type === "magic" || style.type === "ranged") return style.type;
+  return style.type === null ? null : "melee";
+}
+function spellCandidates(spellbook) {
+  const usable = spells.filter((s) => s.spellbook === spellbook && s.max_hit > 0);
+  return usable.filter((s) => !s.element || !usable.some((o) => o.element === s.element && o.max_hit > s.max_hit));
+}
+function attacksFor(combat, weapons, spellbook) {
+  const castable = spellCandidates(spellbook);
+  const attacks = [];
+  for (const weapon of [...weapons, null]) {
+    const seen = /* @__PURE__ */ new Set();
+    for (const style of getCombatStylesForCategory(weapon?.canon.category ?? "Unarmed" /* UNARMED */)) {
+      const key = `${style.type}|${style.stance}`;
+      if (combatStyleOf(style) !== combat || seen.has(key) || style.stance === "Defensive Autocast") continue;
+      seen.add(key);
+      if (CAST_STANCES.includes(style.stance)) attacks.push(...castable.map((spell) => ({ weapon, style, spell })));
+      else attacks.push({ weapon, style, spell: null });
+    }
+  }
+  return attacks;
+}
+function playerWith(template, attack, gear, monster, piece) {
+  const equipment = Object.fromEntries(SLOTS.map((s) => [s, gear[s] ? piece(gear[s]) : null]));
+  const player = {
+    ...template,
+    equipment,
+    style: attack.style,
+    spell: attack.spell
+  };
+  const bonuses = calculateEquipmentBonusesFromGear(player, monster);
+  Object.assign(player, bonuses);
+  player.attackSpeed = calculateAttackSpeed(player, monster);
+  return player;
+}
+function searchDps(template, attack, gear, monster) {
+  const calc = new PlayerVsNPCCalc(playerWith(template, attack, gear, monster, (o) => o.canon), monster, { loadoutName: template.name });
+  if (calc.userIssues.some((i) => BLOCKING_ISSUES.has(i.type))) return -1;
+  return calc.getDps();
+}
+function withoutAliasScan(fn) {
+  const saved = Object.entries(equipmentAliases2);
+  for (const [base] of saved) delete equipmentAliases2[Number(base)];
+  try {
+    return fn();
+  } finally {
+    for (const [base, variants] of saved) equipmentAliases2[Number(base)] = variants;
+  }
+}
+function needsAmmo(attack) {
+  return attack.style.stance !== "Manual Cast" && !!attack.weapon && ammoApplicability(attack.weapon.canon.id, void 0) === 2 /* INVALID */;
+}
+function styleStats(owned, style) {
+  if (!owned) return [0, 0];
+  const { offensive, bonuses } = owned.canon;
+  if (style.type === "magic") return [offensive.magic, bonuses.magic_str];
+  if (style.type === "ranged") return [offensive.ranged, bonuses.ranged_str];
+  return [offensive[style.type], bonuses.str];
+}
+function slotItems(slot, attack, owned, worn) {
+  if (slot === "shield" && attack.weapon?.canon.isTwoHanded) return { fixed: true, plain: [null], named: [] };
+  if (slot === "ammo") {
+    if (!needsAmmo(attack)) return { fixed: true, plain: [worn], named: [] };
+    const fits = owned.filter((o) => ammoApplicability(attack.weapon.canon.id, o.canon.id) === 0 /* INCLUDED */);
+    return { fixed: true, plain: fits, named: [] };
+  }
+  return {
+    fixed: false,
+    plain: [null, ...owned.filter((o) => !ENGINE_NAMED.has(o.canon.name))],
+    named: owned.filter((o) => ENGINE_NAMED.has(o.canon.name))
+  };
+}
+function paretoFront(items, style, worn) {
+  const rank = (o) => o === worn ? -2 : o?.canon.id ?? -1;
+  return items.filter((p) => {
+    const [pa, ps] = styleStats(p, style);
+    return !items.some((q) => {
+      if (q === p) return false;
+      const [qa, qs] = styleStats(q, style);
+      return qa >= pa && qs >= ps && (qa > pa || qs > ps || rank(q) < rank(p));
+    });
+  });
+}
+var MAX_SET_PROBES = 64;
+function effectiveNamed(template, attack, slots, monster) {
+  const base = { weapon: attack.weapon };
+  slots.forEach((items, i) => {
+    const total = (o) => styleStats(o, attack.style)[0] + styleStats(o, attack.style)[1];
+    base[OTHER_SLOTS[i]] = items.plain.reduce((a, b) => total(b) > total(a) ? b : a, items.plain[0] ?? null);
+  });
+  const ghost = (o) => ({ ...o, canon: { ...o.canon, id: -1, name: "" } });
+  const result = (items) => {
+    const gear = { ...base };
+    for (const o of items) gear[o.canon.slot] = o;
+    const player = playerWith(template, attack, gear, monster, (o) => o.canon);
+    const calc = new PlayerVsNPCCalc(player, monster, { loadoutName: template.name });
+    return JSON.stringify([calc.getDps(), calc.getDistribution().getMax(), calc.getHitChance(), player.bonuses, player.offensive]);
+  };
+  const namesMatter = (items, ghosted) => result(items) !== result(items.map((o) => ghosted.includes(o) ? ghost(o) : o));
+  const kept = /* @__PURE__ */ new Set();
+  const quietBySlot = [];
+  for (const { named } of slots) {
+    const quiet = named.filter((item) => {
+      if (namesMatter([item], [item])) kept.add(item);
+      return !kept.has(item);
+    });
+    if (quiet.length) quietBySlot.push(quiet);
+  }
+  if (quietBySlot.reduce((n, quiet) => n * quiet.length, 1) > MAX_SET_PROBES) {
+    for (const item of quietBySlot.flat()) kept.add(item);
+    return kept;
+  }
+  const combos = quietBySlot.reduce((acc, quiet) => acc.flatMap((combo) => quiet.map((item) => [...combo, item])), [[]]);
+  for (const combo of combos) {
+    if (combo.length < 2 || !namesMatter(combo, combo)) continue;
+    for (const item of combo) if (namesMatter(combo, [item])) kept.add(item);
+  }
+  return kept;
+}
+var countSwaps = (gear, worn) => SLOTS.filter((s) => gear[s] !== worn[s]).length;
+function bestForAttack(template, attack, pool, worn, monster) {
+  const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
+  if (slots.some((items) => items.plain.length === 0)) return null;
+  const effective = effectiveNamed(template, attack, slots, monster);
+  const options = slots.map((items, i) => {
+    if (items.fixed) return items.plain;
+    const onStats = [...items.plain, ...items.named.filter((item) => !effective.has(item))];
+    return [...paretoFront(onStats, attack.style, worn[OTHER_SLOTS[i]]), ...items.named.filter((item) => effective.has(item))];
+  });
+  let best = null;
+  const gear = { ...worn, weapon: attack.weapon };
+  const visit = (i) => {
+    if (i === OTHER_SLOTS.length) {
+      const dps = searchDps(template, attack, gear, monster);
+      const swaps = countSwaps(gear, worn);
+      if (dps > 0 && (!best || dps > best.dps || dps === best.dps && swaps < best.swaps)) {
+        best = {
+          attack,
+          gear: { ...gear },
+          dps,
+          swaps
+        };
+      }
+      return;
+    }
+    for (const option of options[i]) {
+      gear[OTHER_SLOTS[i]] = option;
+      visit(i + 1);
+    }
+  };
+  visit(0);
+  return best;
+}
+function keepWornWhereEqual(template, c, worn, monster) {
+  const gear = { ...c.gear };
+  for (const slot of OTHER_SLOTS) {
+    if (gear[slot] === worn[slot]) continue;
+    if (slot === "shield" && c.attack.weapon?.canon.isTwoHanded) continue;
+    const chosen = gear[slot];
+    gear[slot] = worn[slot];
+    if (searchDps(template, c.attack, gear, monster) !== c.dps) gear[slot] = chosen;
+  }
+  return { ...c, gear, swaps: countSwaps(gear, worn) };
+}
+function rankStyle(template, combat, pool, worn, spellbook, monster) {
+  const bestByWeapon = /* @__PURE__ */ new Map();
+  for (const attack of attacksFor(combat, pool.weapon, spellbook)) {
+    const found = bestForAttack(template, attack, pool, worn, monster);
+    const known = bestByWeapon.get(attack.weapon);
+    if (found && (!known || found.dps > known.dps || found.dps === known.dps && found.swaps < known.swaps)) {
+      bestByWeapon.set(attack.weapon, found);
+    }
+  }
+  return [...bestByWeapon.values()].sort((a, b) => b.dps - a.dps).slice(0, SETUPS_PER_STYLE).map((c) => keepWornWhereEqual(template, c, worn, monster));
+}
+function describe2(template, c, worn, monster) {
+  const result = calculate(playerWith(template, c.attack, c.gear, monster, (o) => o.item), monster);
+  const { style } = c.attack;
+  return {
+    items: Object.fromEntries(SLOTS.map((s) => {
+      const o = c.gear[s];
+      return [s, o ? { id: o.ownedId, name: o.item.name, source: o.source } : null];
+    })),
+    style: `${style.displayNameOverride ?? style.name} (${style.stance})`,
+    spell: c.attack.spell?.name ?? null,
+    dps: result.dps,
+    maxHit: result.maxHit,
+    accuracyPct: result.accuracyPct,
+    avgTtkSeconds: result.avgTtkSeconds,
+    swaps: SLOTS.filter((s) => c.gear[s] !== worn[s]).map((s) => ({
+      slot: s,
+      from: worn[s]?.item.name ?? null,
+      to: c.gear[s]?.item.name ?? null,
+      source: c.gear[s]?.source ?? null
+    }))
+  };
+}
+function planBankMode(state, request) {
+  if (!state.loggedIn) throw new Error("The player is logged out: there is no live state to plan from. Log in with the DPS Bridge plugin on.");
+  const monster = resolveMonster({ ...request.monster, reductions: request.drains });
+  const {
+    pool,
+    worn,
+    unknownWorn,
+    notEquipment
+  } = collectOwned(state);
+  const empty2 = Object.fromEntries(SLOTS.map((s) => [s, null]));
+  const template = buildPlayer(state, monster, { equipment: empty2 }).player;
+  const wanted = request.style ? [request.style] : COMBAT_STYLES;
+  const styles = {};
+  for (const combat of wanted) {
+    const unavailable = phaseUnavailable(monster, combat);
+    if (unavailable) {
+      styles[combat] = { unavailable };
+      continue;
+    }
+    const ranked = withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster));
+    styles[combat] = ranked.length ? { setups: ranked.map((c) => describe2(template, c, worn, monster)).sort((a, b) => b.dps - a.dps) } : { unavailable: `No owned setup can attack with ${combat}.` };
+  }
+  const notes = [...unknownWorn];
+  if (notEquipment) {
+    notes.push(`${notEquipment} owned items in the inventory and bank are not equipment in the Wiki calculator's data (supplies, or very new gear); ignored.`);
+  }
+  if (state.autocastSpell && !spells.some((s) => s.name.toLowerCase() === state.autocastSpell.toLowerCase())) {
+    notes.push(`Spell "${state.autocastSpell}" isn't in the Wiki calculator's data; ignored.`);
+  }
+  if (!state.bank) {
+    notes.push("No bank snapshot yet: open the bank once with the DPS Bridge plugin on. Only worn and inventory items were ranked.");
+  }
+  if (wanted.includes("magic")) {
+    notes.push(state.spellbook ? "Magic: runes and spell level requirements are not checked." : "Spellbook unknown (state file version 1): magic ranks powered staves only.");
+  }
+  return {
+    monster: { id: monster.id, name: monster.name, version: monster.version ?? "" },
+    styles,
+    bankAgeMs: state.bank?.ageMs ?? null,
+    notes
+  };
+}
+
+// src/core/liveState.ts
+import { readFile as readFile2 } from "node:fs/promises";
+var itemStack = object({ id: number2().int(), quantity: number2().int() });
+var skillMap = partialRecord(
+  _enum(["atk", "str", "def", "ranged", "magic", "prayer", "hp", "mining", "herblore", "farming"]),
+  number2().int()
+);
+var loggedInState = object({
+  version: number2().int().min(1).max(2),
+  loggedIn: literal(true),
+  timestamp: number2().optional(),
+  playerName: string2().optional(),
+  equipment: record(string2(), number2().int().nullable()).optional(),
+  realLevels: skillMap.optional(),
+  boostedLevels: skillMap.optional(),
+  prayers: array(string2()).optional(),
+  attackStyleIndex: number2().int().optional(),
+  castingMode: number2().int().optional(),
+  styleSlots: array(string2()).optional(),
+  autocastSpell: string2().optional(),
+  buffs: object({
+    onSlayerTask: boolean2().optional(),
+    inWilderness: boolean2().optional(),
+    kandarinDiary: boolean2().optional(),
+    chargeSpell: boolean2().optional()
+  }).optional(),
+  target: object({ id: number2().int(), name: string2() }).nullable().optional(),
+  inventory: array(itemStack).default([]),
+  runePouch: array(object({ runeItemId: number2().int(), quantity: number2().int() })).default([]),
+  spellbook: _enum(["standard", "ancient", "lunar", "arceuus"]).nullable().default(null),
+  drains: object({
+    targetId: number2().int(),
+    dwhHits: number2().int(),
+    elderMaulHits: number2().int(),
+    bgsDamage: number2().int()
+  }).nullable().default(null)
+});
+var loggedOutState = object({
+  version: number2().int().min(1).max(2),
+  loggedIn: literal(false),
+  timestamp: number2().optional()
+});
+var stateFileSchema = discriminatedUnion("loggedIn", [loggedInState, loggedOutState]);
+var bankFileSchema = object({
+  timestamp: number2(),
+  items: array(itemStack)
+});
+async function readJson(file) {
+  let text;
+  try {
+    text = await readFile2(file, "utf8");
+  } catch (e) {
+    if (e.code === "ENOENT") return void 0;
+    throw e;
+  }
+  return JSON.parse(text);
+}
+async function readState(stateFile, bankFile, now = Date.now()) {
+  const rawState = await readJson(stateFile);
+  if (rawState === void 0) {
+    throw new Error(`No state file at ${stateFile}. Log in with the "DPS Bridge" plugin enabled.`);
+  }
+  const state = stateFileSchema.safeParse(rawState);
+  if (!state.success) throw new Error(`State file ${stateFile} does not match the schema:
+${prettifyError(state.error)}`);
+  let bank = null;
+  const rawBank = await readJson(bankFile);
+  if (rawBank !== void 0) {
+    const parsed = bankFileSchema.safeParse(rawBank);
+    if (!parsed.success) throw new Error(`Bank file ${bankFile} does not match the schema:
+${prettifyError(parsed.error)}`);
+    bank = { items: parsed.data.items, ageMs: now - parsed.data.timestamp };
+  }
+  if (!state.data.loggedIn) {
+    return {
+      source: "dps-bridge",
+      loggedIn: false,
+      timestamp: state.data.timestamp,
+      inventory: [],
+      bank,
+      runePouch: [],
+      spellbook: null,
+      drains: null
+    };
+  }
+  const { version: _version, ...fields } = state.data;
+  return { source: "dps-bridge", ...fields, bank };
+}
+
 // src/index.ts
+import { dirname, join as join2 } from "node:path";
 var CHARACTER_LIMIT = 25e3;
 var ResponseFormat = /* @__PURE__ */ ((ResponseFormat2) => {
   ResponseFormat2["MARKDOWN"] = "markdown";
@@ -330839,6 +331500,16 @@ function mdLoadout(l) {
     `- **On slayer task**: ${l.onSlayerTask ? "yes" : "no"}`
   ].join("\n");
 }
+function mdSetup(s, rank) {
+  const gear = Object.entries(s.items).filter(([, item]) => item).map(([slot, item]) => `${slot}: ${item.name} [${item.source}]`).join(" \xB7 ");
+  const swaps = s.swaps.map((w) => `${w.slot}: ${w.from ?? "empty"} \u2192 ${w.to ? `${w.to} [${w.source}]` : "empty"}`).join("; ");
+  return [
+    `${rank}. **${s.dps} DPS** \xB7 max hit ${s.maxHit} \xB7 accuracy ${s.accuracyPct}% \xB7 avg kill ${s.avgTtkSeconds ?? "?"}s \xB7 ${s.style}${s.spell ? ` \xB7 ${s.spell}` : ""}`,
+    `   - **Gear**: ${gear || "(nothing equipped)"}`,
+    `   - **Swaps (${s.swaps.length})**: ${swaps || "none, this is what you wear now"}`
+  ].join("\n");
+}
+var mdAge = (ms) => ms < 36e5 ? `${Math.max(0, Math.round(ms / 6e4))} min` : `${Math.round(ms / 36e5)} h`;
 function createServer() {
   const server = new McpServer({ name: "osrs-dps-mcp-server", version: "0.2.0" });
   server.registerTool("osrs_get_loadout", {
@@ -330953,6 +331624,42 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
       "|---|---|---|---|---|---|---|",
       ...rows.map((r, i) => r.error ? `| ${i + 1} | ${r.label} | | error: ${r.error} | | | |` : `| ${i + 1} | ${r.label} | ${r.defence} | ${r.dps} | ${r.max_hit} | ${r.accuracy_pct}% | ${r.avg_ttk_seconds ?? "?"}s |`)
     ].join("\n") + mdNotes(notes));
+  });
+  server.registerTool("osrs_best_owned_setup", {
+    title: "Best owned OSRS setup",
+    description: `Rank the best setups the player OWNS against one monster version, per combat style (melee, ranged, magic). The owned pool is the worn gear, the inventory and the last bank snapshot from the DPS Bridge plugin. DPS comes from the OSRS Wiki DPS calculator engine with the player's live levels and prayers.
+
+Returns up to 3 setups per style: the best setup for each of the 3 best weapons. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
+
+Examples:
+  - "Best setup I own vs Maggot King Far?" -> {monster: "Maggot King", monster_version: "Far"}
+  - "Best ranged setup I own for Vorkath?" -> {monster: "Vorkath", monster_version: "Post-quest", style: "ranged"}
+  - "And after 2 DWH specs?" -> {monster: "Maggot King", monster_version: "Nearby", defence_reductions: {dwh_hits: 2}}
+Use osrs_search_monsters for the exact monster_version. Prefer monster + monster_version to monster_id: the phases of one boss can share an id.`,
+    inputSchema: strictObject({
+      ...monsterFields,
+      style: _enum(["melee", "ranged", "magic"]).optional().describe("One combat style. Omit to rank all three."),
+      response_format: responseFormat
+    }),
+    annotations: READ_ONLY
+  }, async (a) => {
+    const state = await readState(bridgeFile(), join2(dirname(bridgeFile()), "bank.json"));
+    let monster;
+    if (a.monster_id !== void 0) monster = { id: a.monster_id };
+    else if (a.monster) monster = { name: a.monster, version: a.monster_version };
+    else if (state.target) monster = state.target;
+    else throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Maggot King") and `monster_version`.');
+    const plan = planBankMode(state, { monster, style: a.style, drains: toReductions(a.defence_reductions) });
+    const label = `${plan.monster.name}${plan.monster.version ? ` (${plan.monster.version})` : ""}`;
+    return reply(a.response_format, { ...plan }, () => [
+      `# Best owned setups vs ${label}`,
+      plan.bankAgeMs === null ? "Bank: no snapshot yet." : `Bank snapshot: ${mdAge(plan.bankAgeMs)} old.`,
+      ...Object.entries(plan.styles).flatMap(([style, stylePlan]) => [
+        "",
+        `## ${style[0].toUpperCase()}${style.slice(1)}`,
+        "unavailable" in stylePlan ? `Unavailable: ${stylePlan.unavailable}` : stylePlan.setups.map((s, i) => mdSetup(s, i + 1)).join("\n")
+      ])
+    ].join("\n") + mdNotes(plan.notes));
   });
   server.registerTool("osrs_search_monsters", {
     title: "Search OSRS monsters",

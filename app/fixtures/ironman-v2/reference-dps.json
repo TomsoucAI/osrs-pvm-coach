@@ -1,0 +1,91 @@
+{
+  "about": "Six reference setups for the ironman-v2 fixture. engineDps is what this repo computes. wikiDps is what Tom reads in the official Wiki DPS calculator for the same setup (Owner verifies, issue #5); null = not entered yet.",
+  "player": "Levels: Attack 90, Strength 92, Defence 85, Ranged 92, Magic 90, Prayer 77, Hitpoints 93. No potion boost, no prayer, not on a slayer task.",
+  "references": [
+    {
+      "label": "Far ranged",
+      "version": "Far",
+      "style": "ranged",
+      "combatStyle": "Rapid (Rapid)",
+      "spell": null,
+      "items": {
+        "head": "Slayer helmet (i)", "cape": "Ava's assembler", "neck": "Necklace of anguish", "ammo": "Ruby bolts (e)",
+        "weapon": "Rune crossbow", "body": "Black d'hide body", "shield": null, "legs": "Black d'hide chaps",
+        "hands": "Barrows gloves", "feet": "Snakeskin boots", "ring": "Archers ring (i)"
+      },
+      "engineDps": 4.344,
+      "wikiDps": null
+    },
+    {
+      "label": "Far magic",
+      "version": "Far",
+      "style": "magic",
+      "combatStyle": "Spell (Autocast)",
+      "spell": "Fire Surge",
+      "items": {
+        "head": "Ahrim's hood", "cape": "Imbued Saradomin cape", "neck": "Occult necklace", "ammo": null,
+        "weapon": "Mystic smoke staff", "body": "Ahrim's robetop", "shield": "Tome of Fire", "legs": "Ahrim's robeskirt",
+        "hands": "Barrows gloves", "feet": "Infinity boots", "ring": "Seers ring (i)"
+      },
+      "engineDps": 3.334,
+      "wikiDps": null
+    },
+    {
+      "label": "Nearby melee",
+      "version": "Nearby",
+      "style": "melee",
+      "combatStyle": "Pummel (Aggressive)",
+      "spell": null,
+      "items": {
+        "head": "Helm of Neitiznot", "cape": "Fire cape", "neck": "Amulet of fury", "ammo": null,
+        "weapon": "Dragon warhammer", "body": "Fighter torso", "shield": "Dragon defender", "legs": "Dragon platelegs",
+        "hands": "Barrows gloves", "feet": "Dragon boots", "ring": "Berserker ring (i)"
+      },
+      "engineDps": 1.963,
+      "wikiDps": null
+    },
+    {
+      "label": "Nearby ranged",
+      "version": "Nearby",
+      "style": "ranged",
+      "combatStyle": "Rapid (Rapid)",
+      "spell": null,
+      "items": {
+        "head": "Slayer helmet (i)", "cape": "Ava's assembler", "neck": "Necklace of anguish", "ammo": "Ruby bolts (e)",
+        "weapon": "Rune crossbow", "body": "Black d'hide body", "shield": null, "legs": "Black d'hide chaps",
+        "hands": "Barrows gloves", "feet": "Snakeskin boots", "ring": "Archers ring (i)"
+      },
+      "engineDps": 4.344,
+      "wikiDps": null
+    },
+    {
+      "label": "Nearby magic",
+      "version": "Nearby",
+      "style": "magic",
+      "combatStyle": "Accurate (Accurate)",
+      "spell": null,
+      "items": {
+        "head": "Ahrim's hood", "cape": "Imbued Saradomin cape", "neck": "Occult necklace", "ammo": null,
+        "weapon": "Trident of the Swamp", "body": "Ahrim's robetop", "shield": "Tome of Fire", "legs": "Ahrim's robeskirt",
+        "hands": "Barrows gloves", "feet": "Infinity boots", "ring": "Seers ring (i)"
+      },
+      "engineDps": 0.669,
+      "wikiDps": null
+    },
+    {
+      "label": "Nearby melee, 2 Dragon warhammer hits",
+      "version": "Nearby",
+      "style": "melee",
+      "dwhHits": 2,
+      "combatStyle": "Lash (Controlled)",
+      "spell": null,
+      "items": {
+        "head": "Helm of Neitiznot", "cape": "Fire cape", "neck": "Amulet of fury", "ammo": null,
+        "weapon": "Abyssal whip", "body": "Fighter torso", "shield": "Dragon defender", "legs": "Dragon platelegs",
+        "hands": "Barrows gloves", "feet": "Dragon boots", "ring": "Berserker ring (i)"
+      },
+      "engineDps": 3.5,
+      "wikiDps": null
+    }
+  ]
+}

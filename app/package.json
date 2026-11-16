@@ -5,10 +5,11 @@
   "main": "index.js",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node build.mjs && node dist/selftest.js && tsx scripts/smoke.ts",
+    "test": "node build.mjs && node dist/selftest.js && node --test dist/core.test.js && tsx scripts/smoke.ts",
     "start": "node dist/index.js",
     "setup": "node setup.mjs",
-    "update-calc": "node setup.mjs --latest && node build.mjs",
+    "update-calc": "node setup.mjs --latest && tsx scripts/gen-engine-named-items.ts && node build.mjs",
+    "gen-named-items": "tsx scripts/gen-engine-named-items.ts",
     "smoke": "tsx scripts/smoke.ts"
   },
   "keywords": [],

@@ -1,4 +1,5 @@
 node_modules/
 vendor/
+app/dist/*.test.js
 plugin/build/
 plugin/.gradle/

@@ -1,0 +1,67 @@
+{
+  "version": 2,
+  "loggedIn": true,
+  "playerName": "OracleIron",
+  "equipment": {
+    "head": 10828,
+    "cape": null,
+    "neck": null,
+    "weapon": 4151,
+    "body": 10551,
+    "shield": 12954,
+    "legs": null,
+    "hands": 7462,
+    "feet": null,
+    "ring": null,
+    "ammo": null
+  },
+  "realLevels": {
+    "atk": 90,
+    "str": 92,
+    "def": 85,
+    "ranged": 92,
+    "magic": 90,
+    "prayer": 77,
+    "hp": 93,
+    "mining": 70,
+    "herblore": 80,
+    "farming": 75
+  },
+  "boostedLevels": {
+    "atk": 90,
+    "str": 92,
+    "def": 85,
+    "ranged": 92,
+    "magic": 90,
+    "prayer": 77,
+    "hp": 93,
+    "mining": 70,
+    "herblore": 80,
+    "farming": 75
+  },
+  "prayers": [],
+  "attackStyleIndex": 1,
+  "castingMode": 0,
+  "weaponCategory": 20,
+  "styleSlots": [
+    "Flick",
+    "Lash",
+    "Other",
+    "Deflect"
+  ],
+  "buffs": {
+    "onSlayerTask": true,
+    "inWilderness": false,
+    "kandarinDiary": false,
+    "chargeSpell": false
+  },
+  "target": null,
+  "inventory": [
+    { "id": 13263, "quantity": 1 },
+    { "id": 9185, "quantity": 1 },
+    { "id": 9243, "quantity": 200 }
+  ],
+  "runePouch": [],
+  "spellbook": "standard",
+  "timestamp": 1794791879541
+}
