@@ -51,4 +51,4 @@ node tools/legal-lint.mjs
 - Never commit or paste anything from `~/.runelite/` except `plugin-data/dps_bridge/` output, and remove your character name from that output first.
 - Use synthetic data in fixtures and examples (see `examples/state.sample.json`).
 - Never commit a key, a token or a password. Secret push protection is on, and it will block the push.
-- To report a security problem, do not open a public issue with the details. Open an issue that asks for a private contact instead.
+- To report a security problem, do not open a public issue. Use **Report a vulnerability** in the repo's [Security tab](https://github.com/TomsoucAI/osrs-pvm-coach/security). Only the maintainer sees the report.
