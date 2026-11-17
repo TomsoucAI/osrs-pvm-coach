@@ -14,7 +14,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "GPL-3.0-only",
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
     "axios": "^1.21.1",
