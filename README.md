@@ -84,7 +84,8 @@ npm test                # offline self-tests
 
 ## License
 
-The calculator engine is GPL-3.0 (weirdgloop/osrs-dps-calc), so the bundled `dist/` is GPL-3.0 too.
+- `app/` (MCP server): GPL-3.0, see `app/LICENSE`. It bundles the calculator engine (weirdgloop/osrs-dps-calc), which is GPL-3.0, so the bundled `dist/` is GPL-3.0 too.
+- `plugin/` (RuneLite plugin): BSD-2, see `plugin/LICENSE`, as the Plugin Hub requires.
 
 ## Quality checks (built with the `mcp-builder` skill)
 
