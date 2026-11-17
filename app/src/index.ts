@@ -274,15 +274,15 @@ Examples:
   - "Best ranged setup I own for Vorkath?" -> {monster: "Vorkath", monster_version: "Post-quest", style: "ranged"}
   - "Plan Maggot King Nearby with 2 DWH" -> {monster: "Maggot King", monster_version: "Nearby", defence_reductions: {dwh_hits: 2}}
   - "My real DPS options right now?" -> {monster: "Maggot King", monster_version: "Nearby", boosts: "live"}
-  - "I don't have Rigour or Augury" -> {..., unlocked_prayers: ["Piety", "Eagle Eye", "Mystic Might"]}
+  - "I don't have Rigour or Augury" -> {..., unlocked_prayers: ["PIETY", "EAGLE_EYE", "MYSTIC_MIGHT"]}
 Use osrs_search_monsters for the exact monster_version. Prefer monster + monster_version to monster_id: the phases of one boss can share an id.`,
     inputSchema: z.strictObject({
       ...monsterFields,
       style: z.enum(['melee', 'ranged', 'magic']).optional().describe('One combat style. Omit to rank all three.'),
       boosts: z.enum(['planned', 'live']).default('planned')
         .describe("'planned' (default): the best unlocked prayer and the best owned potion of each style, for planning in the bank. 'live': the levels and prayers as they are now, for the real DPS at the boss."),
-      unlocked_prayers: z.array(z.string()).max(30).optional()
-        .describe(`The prayers that 'planned' can assume, e.g. ["Piety", "Eagle Eye", "Mystic Might"]. Omit when the player has every prayer. Values: ${VALID.prayers.join(', ')}`),
+      unlocked_prayers: z.array(z.enum(VALID.prayers)).max(30).optional()
+        .describe('The prayers that \'planned\' can assume, e.g. ["PIETY", "EAGLE_EYE", "MYSTIC_MIGHT"]. Omit when the player has every prayer.'),
       response_format: responseFormat,
     }),
     annotations: READ_ONLY,
@@ -304,7 +304,9 @@ Use osrs_search_monsters for the exact monster_version. Prefer monster + monster
       plan.boosts === 'planned'
         ? 'Boosts: Planned (the best unlocked prayer and the best owned potion of each style).'
         : 'Boosts: Live (the levels and prayers as they are now).',
-      effective !== base ? `Defence ${base} → **${effective}** after drains.` : `Defence ${base}.`,
+      effective !== base
+        ? `Defence ${base} → **${effective}** after drains (-${Math.round((1 - effective / base) * 100)}%).`
+        : `Defence ${base}.`,
       plan.bankAgeMs === null ? 'Bank: no snapshot yet.' : `Bank snapshot: ${mdAge(plan.bankAgeMs)} old.`,
       ...Object.entries(plan.styles).flatMap(([style, stylePlan]) => [
         '',

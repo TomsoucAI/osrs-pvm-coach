@@ -119,7 +119,7 @@ type BoostPlan = {
     tiers: Record<string, { dps: number; swaps: unknown[] } | null>;
   }>;
 };
-const nearby = { monster: 'Maggot King', monster_version: 'Nearby', unlocked_prayers: ['Piety', 'Rigour', 'Augury'] };
+const nearby = { monster: 'Maggot King', monster_version: 'Nearby', unlocked_prayers: ['PIETY', 'RIGOUR', 'AUGURY'] };
 const noDrain = (await call('osrs_best_owned_setup', { ...nearby, response_format: 'json' }, fixture)).structuredContent as BoostPlan;
 const twoDwh = (await call('osrs_best_owned_setup', { ...nearby, defence_reductions: { dwh_hits: 2 }, response_format: 'json' }, fixture))
   .structuredContent as BoostPlan;
@@ -134,7 +134,9 @@ assert.ok(twoDwh.styles.melee.setups[0].dps > noDrain.styles.melee.setups[0].dps
 
 const dwhText = ((await call('osrs_best_owned_setup', { ...nearby, defence_reductions: { dwh_hits: 2 } }, fixture)).content[0] as { text: string }).text;
 assert.match(dwhText, /Boosts: Planned/);
-assert.match(dwhText, new RegExp(`Defence ${twoDwh.defence.base} → \\*\\*${twoDwh.defence.effective}\\*\\* after drains`));
+const drainedPct = Math.round((1 - twoDwh.defence.effective / twoDwh.defence.base) * 100);
+assert.ok(drainedPct >= 50 && drainedPct <= 52, `2 DWH hits remove about 51% of the defence, got ${drainedPct}%`);
+assert.match(dwhText, new RegExp(`Defence ${twoDwh.defence.base} → \\*\\*${twoDwh.defence.effective}\\*\\* after drains \\(-${drainedPct}%\\)`));
 assert.match(dwhText, /Assumed: Piety · Super combat potion \(6 doses owned\)/);
 assert.match(dwhText, /Best owned: \*\*[\d.]+ DPS\*\*/);
 assert.match(dwhText, /≤ 2 swaps: \*\*[\d.]+ DPS\*\*/);
@@ -144,9 +146,9 @@ const liveText = ((await call('osrs_best_owned_setup', { ...nearby, boosts: 'liv
 assert.match(liveText, /Boosts: Live/);
 assert.doesNotMatch(liveText, /Assumed:/);
 
-const badUnlocked = await fixture.callTool({ name: 'osrs_best_owned_setup', arguments: { ...nearby, unlocked_prayers: ['Super Piety'] } });
-assert.equal(badUnlocked.isError, true, 'an unknown unlocked prayer should be a readable tool error');
-assert.match((badUnlocked.content[0] as { text: string }).text, /Valid:/);
+const badUnlocked = await fixture.callTool({ name: 'osrs_best_owned_setup', arguments: { ...nearby, unlocked_prayers: ['SUPER_PIETY'] } });
+assert.equal(badUnlocked.isError, true, 'an unknown unlocked prayer should be rejected by the schema');
+assert.match((badUnlocked.content[0] as { text: string }).text, /Input validation error/);
 await fixture.close();
 
 console.error('Smoke test passed');
