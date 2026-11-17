@@ -331678,7 +331678,7 @@ function mdAssumed(assumed) {
 }
 function mdTier(label, s) {
   if (!s) return `- ${label}: no setup can attack with this style.`;
-  return `- ${label}: **${s.dps} DPS** \xB7 ${s.swaps.length ? `${s.swaps.length} swaps (${mdSwaps(s)})` : "no swap"}`;
+  return `- ${label}: **${s.dps} DPS** \xB7 ${s.swaps.length ? `${s.swaps.length} swap${s.swaps.length > 1 ? "s" : ""} (${mdSwaps(s)})` : "no swap"}`;
 }
 var mdAge = (ms) => ms < 36e5 ? `${Math.max(0, Math.round(ms / 6e4))} min` : `${Math.round(ms / 36e5)} h`;
 function createServer() {

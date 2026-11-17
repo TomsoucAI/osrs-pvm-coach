@@ -144,7 +144,7 @@ function mdAssumed(assumed: AssumedBoosts) {
 
 function mdTier(label: string, s: Setup | null) {
   if (!s) return `- ${label}: no setup can attack with this style.`;
-  return `- ${label}: **${s.dps} DPS** · ${s.swaps.length ? `${s.swaps.length} swaps (${mdSwaps(s)})` : 'no swap'}`;
+  return `- ${label}: **${s.dps} DPS** · ${s.swaps.length ? `${s.swaps.length} swap${s.swaps.length > 1 ? 's' : ''} (${mdSwaps(s)})` : 'no swap'}`;
 }
 
 const mdAge = (ms: number) => (ms < 3_600_000 ? `${Math.max(0, Math.round(ms / 60_000))} min` : `${Math.round(ms / 3_600_000)} h`);
