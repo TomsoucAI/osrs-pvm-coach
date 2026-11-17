@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.StandardCopyOption;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.inject.Inject;
@@ -60,6 +61,7 @@ import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
+import net.runelite.api.gameval.NpcID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.callback.ClientThread;
@@ -97,6 +99,14 @@ public class DpsBridgePlugin extends Plugin
 	};
 	// VarbitID.SPELLBOOK value -> name, in value order
 	private static final String[] SPELLBOOKS = {"standard", "ancient", "lunar", "arceuus"};
+	// Minions that the player attacks in the middle of a boss kill. They never become the counted
+	// target, so the boss keeps its drains (from the core Special Attack Counter's IGNORED_NPCS).
+	private static final Set<Integer> MINION_NPCS = Set.of(
+		NpcID.DARK_CORE,
+		NpcID.VORKATH_SPAWN_QUEST, NpcID.VORKATH_SPAWN,
+		NpcID.VETION_HELLHOUND_JNR, NpcID.VETION_HELLHOUND_SNR,
+		NpcID.ABYSSALSIRE_SPAWN, NpcID.ABYSSALSIRE_SCION
+	);
 
 	@Inject
 	private Client client;
@@ -182,7 +192,10 @@ public class DpsBridgePlugin extends Plugin
 			t.addProperty("id", npc.getId());
 			t.addProperty("name", npc.getName());
 			lastTarget = t; // remembered after the kill so you can still ask about it
-			specs.target(npc.getIndex(), npc.getId());
+			if (countsSpecs(npc))
+			{
+				specs.target(npc.getIndex(), npc.getId());
+			}
 		}
 		j.add("target", lastTarget);
 
@@ -228,7 +241,7 @@ public class DpsBridgePlugin extends Plugin
 			SpecTracker.Weapon weapon = specWeapon();
 			Player me = client.getLocalPlayer();
 			Actor target = me == null ? null : me.getInteracting();
-			if (weapon == null || !(target instanceof NPC))
+			if (weapon == null || !(target instanceof NPC) || !countsSpecs((NPC) target))
 			{
 				return;
 			}
@@ -285,6 +298,12 @@ public class DpsBridgePlugin extends Plugin
 		{
 			specs.npcGone(((NPC) e.getActor()).getIndex());
 		}
+	}
+
+	// A dying NPC is not taken as the target again after its death reset the counts.
+	private static boolean countsSpecs(NPC npc)
+	{
+		return !npc.isDead() && !MINION_NPCS.contains(npc.getId());
 	}
 
 	private SpecTracker.Weapon specWeapon()

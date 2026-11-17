@@ -4,7 +4,9 @@
  * Run with: npm run build && npm run smoke
  */
 import { strict as assert } from 'node:assert';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
@@ -122,6 +124,23 @@ assert.equal(manual.result.dps, 7.753);
 
 const other = (await call('osrs_calculate_dps', { monster: 'Vorkath', monster_version: 'Post-quest', response_format: 'json' }, drained)).structuredContent as Dps;
 assert.deepEqual(other.defence_level, { base: 214, effective: 214 });
+
+// osrs_compare_setups: "current" carries the counted drains, a variant's own defence_reductions replace them
+const cmpDrained = (await call('osrs_compare_setups', {
+  response_format: 'json', variants: [{ label: 'dwh missed', defence_reductions: { dwh_hits: 0 } }],
+}, drained)).structuredContent as { results: { label: string; defence: number }[]; notes: string[] };
+assert.deepEqual(cmpDrained.results.map((r) => [r.label, r.defence]), [['current', 95], ['dwh missed', 135]]);
+assert.ok(cmpDrained.notes.some((n) => /counted/i.test(n)));
 await drained.close();
+
+// Drains that do not match the schema count as no drains: the rest of the state still reads
+const malformedFile = join(mkdtempSync(join(tmpdir(), 'dps-bridge-')), 'state.json');
+const drainsFixture = JSON.parse(readFileSync('fixtures/spec-drains/state.json', 'utf8'));
+writeFileSync(malformedFile, JSON.stringify({ ...drainsFixture, drains: { targetId: 415, dwhHits: 'one' } }));
+const malformed = await connect(malformedFile);
+const noDrains = (await call('osrs_calculate_dps', { response_format: 'json' }, malformed)).structuredContent as Dps;
+assert.deepEqual(noDrains.defence_level, { base: 135, effective: 135 });
+assert.equal(noDrains.result.dps, 7.753);
+await malformed.close();
 
 console.error('Smoke test passed');

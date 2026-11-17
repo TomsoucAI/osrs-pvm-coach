@@ -312971,6 +312971,21 @@ function countedReductions(snap, monster) {
   if (!countedOn || norm(countedOn) !== norm(monster.name)) return void 0;
   return { dwhHits: d.dwhHits, elderMaulHits: d.elderMaulHits, bgsDamage: d.bgsDamage };
 }
+function countedDrainsNote(r) {
+  const parts = [
+    r.dwhHits ? `${r.dwhHits} Dragon warhammer hit(s)` : "",
+    r.elderMaulHits ? `${r.elderMaulHits} Elder maul hit(s)` : "",
+    r.bgsDamage ? `${r.bgsDamage} Bandos godsword damage` : ""
+  ].filter(Boolean);
+  return `Counted drains on this target are in the DPS: ${parts.join(", ")}. Pass manual drains to replace them.`;
+}
+function resolveMonsterWithDrains(spec, snap, manual) {
+  const counted = manual ? void 0 : countedReductions(snap, resolveMonster(spec));
+  return {
+    monster: resolveMonster({ ...spec, reductions: manual ?? counted }),
+    drainNotes: counted ? [countedDrainsNote(counted)] : []
+  };
+}
 function itemFromNameOrId(v) {
   if (typeof v === "number" || /^\d+$/.test(v)) {
     const item2 = findItem(Number(v));
@@ -313266,8 +313281,7 @@ async function printOnce() {
     return;
   }
   const spec = monsterName ? { name: monsterName } : snap.target ? { id: snap.target.id, name: snap.target.name } : { name: "Abyssal demon" };
-  const counted = countedReductions(snap, resolveMonster(spec));
-  const monster = resolveMonster({ ...spec, reductions: counted });
+  const { monster, drainNotes } = resolveMonsterWithDrains(spec, snap);
   const { player, notes } = buildPlayer(snap, monster);
   const l = describeLoadout(player);
   const r = calculate(player, monster);
@@ -313280,7 +313294,7 @@ async function printOnce() {
   console.log("Target  ", snap.target ? `${snap.target.name} (#${snap.target.id})` : "(none, using default)", "| slayer task:", l.onSlayerTask);
   if (snap.source === "dps-bridge") await printV2(snap);
   const d = snap.drains;
-  console.log("Drains   ", d ? `DWH hits ${d.dwhHits} | Elder maul hits ${d.elderMaulHits} | BGS damage ${d.bgsDamage} (on #${d.targetId})${counted ? "" : ", not in this DPS"}` : "(no counted target)");
+  console.log("Drains   ", d ? `DWH hits ${d.dwhHits} | Elder maul hits ${d.elderMaulHits} | BGS damage ${d.bgsDamage} (on #${d.targetId})${drainNotes.length ? "" : ", not in this DPS"}` : "(no counted target)");
   console.log(`DPS vs ${monster.name}${monster.version ? ` (${monster.version})` : ""}: ${r.dps}  max ${r.maxHit}  acc ${r.accuracyPct}%  ttk ${r.avgTtkSeconds}s`);
   for (const n of notes) console.log("  note:", n);
 }

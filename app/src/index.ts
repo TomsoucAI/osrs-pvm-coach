@@ -7,8 +7,8 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
 import {
-  buildPlayer, calculate, countedDrainsNote, countedReductions, defenceAfterReductions, DefenceReductions, describeLoadout, Overrides,
-  resolveMonster,
+  buildPlayer, calculate, defenceAfterReductions, DefenceReductions, describeLoadout, Overrides, resolveMonster,
+  resolveMonsterWithDrains,
   searchMonsters, VALID,
 } from './calc';
 import { bridgeFile, getSnapshot, Snapshot } from './snapshot';
@@ -97,12 +97,7 @@ function pickMonster(snap: Snapshot, a: {
   else throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Vorkath"), or ask the player to attack the NPC first.');
 
   // Manual defence_reductions replace the drains that the plugin counted on this monster.
-  const manual = toReductions(a.defence_reductions);
-  const counted = manual ? undefined : countedReductions(snap, resolveMonster(spec));
-  return {
-    monster: resolveMonster({ ...spec, reductions: manual ?? counted }),
-    drainNotes: counted ? [countedDrainsNote(counted)] : [],
-  };
+  return resolveMonsterWithDrains(spec, snap, toReductions(a.defence_reductions));
 }
 
 const monsterLabel = (m: Monster) => `${m.name}${m.version ? ` (${m.version})` : ''}`;

@@ -330569,6 +330569,13 @@ function countedDrainsNote(r) {
   ].filter(Boolean);
   return `Counted drains on this target are in the DPS: ${parts.join(", ")}. Pass manual drains to replace them.`;
 }
+function resolveMonsterWithDrains(spec, snap, manual) {
+  const counted = manual ? void 0 : countedReductions(snap, resolveMonster(spec));
+  return {
+    monster: resolveMonster({ ...spec, reductions: manual ?? counted }),
+    drainNotes: counted ? [countedDrainsNote(counted)] : []
+  };
+}
 function defenceAfterReductions(monster) {
   return { base: monster.skills.def, effective: scaleMonster(monster).skills.def };
 }
@@ -331356,8 +331363,7 @@ function describe2(template, c, worn, monster) {
 }
 function planBankMode(state, request) {
   if (!state.loggedIn) throw new Error("The player is logged out: there is no live state to plan from. Log in with the DPS Bridge plugin on.");
-  const counted = request.drains ? void 0 : countedReductions(state, resolveMonster(request.monster));
-  const monster = resolveMonster({ ...request.monster, reductions: request.drains ?? counted });
+  const { monster, drainNotes } = resolveMonsterWithDrains(request.monster, state, request.drains);
   const {
     pool,
     worn,
@@ -331377,8 +331383,7 @@ function planBankMode(state, request) {
     const ranked = withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster));
     styles[combat] = ranked.length ? { setups: ranked.map((c) => describe2(template, c, worn, monster)).sort((a, b) => b.dps - a.dps) } : { unavailable: `No owned setup can attack with ${combat}.` };
   }
-  const notes = [...unknownWorn];
-  if (counted) notes.push(countedDrainsNote(counted));
+  const notes = [...unknownWorn, ...drainNotes];
   if (notEquipment) {
     notes.push(`${notEquipment} owned items in the inventory and bank are not equipment in the Wiki calculator's data (supplies, or very new gear); ignored.`);
   }
@@ -331544,12 +331549,7 @@ function pickMonster(snap, a) {
   if (a.monster_id !== void 0 || a.monster) spec = { id: a.monster_id, name: a.monster, version: a.monster_version };
   else if (snap.target) spec = { id: snap.target.id, name: snap.target.name };
   else throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Vorkath"), or ask the player to attack the NPC first.');
-  const manual = toReductions(a.defence_reductions);
-  const counted = manual ? void 0 : countedReductions(snap, resolveMonster(spec));
-  return {
-    monster: resolveMonster({ ...spec, reductions: manual ?? counted }),
-    drainNotes: counted ? [countedDrainsNote(counted)] : []
-  };
+  return resolveMonsterWithDrains(spec, snap, toReductions(a.defence_reductions));
 }
 var monsterLabel = (m) => `${m.name}${m.version ? ` (${m.version})` : ""}`;
 function sourceWarnings(snap) {

@@ -191,6 +191,17 @@ test('counted drains do not apply to another monster', async () => {
   assert.ok(!plan.notes.some((n) => /counted/i.test(n)), plan.notes.join('\n'));
 });
 
+test('counted drains apply when the engine data does not know the NPC id but the target name matches', async () => {
+  const state = await withCountedDwhHits();
+  const unknownId: LiveState = {
+    ...state, target: { id: 99999999, name: 'Maggot King' }, drains: { ...state.drains!, targetId: 99999999 },
+  };
+
+  const plan = planBankMode(unknownId, { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee' });
+
+  assert.equal(setupsOf(plan.styles.melee)[0].dps, 3.5);
+});
+
 test('notes name the items and spells that the engine data does not know', async () => {
   const state = await load('ironman-v2');
   const withUnknown: LiveState = {

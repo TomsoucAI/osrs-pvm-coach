@@ -119,7 +119,7 @@ export function resolveMonster(opts: {
  * The counted drains as reductions for `monster`, or undefined when there are none for it.
  * The plugin counts on a game NPC id and the phases of one boss share a name, so the name decides.
  */
-export function countedReductions(snap: Pick<Snapshot, 'target' | 'drains'>, monster: Monster): DefenceReductions | undefined {
+function countedReductions(snap: Pick<Snapshot, 'target' | 'drains'>, monster: Monster): DefenceReductions | undefined {
   const d = snap.drains;
   if (!d || !(d.dwhHits || d.elderMaulHits || d.bgsDamage)) return undefined;
   const countedOn = monsters.find((m) => m.id === d.targetId)?.name ?? (snap.target?.id === d.targetId ? snap.target.name : undefined);
@@ -128,13 +128,29 @@ export function countedReductions(snap: Pick<Snapshot, 'target' | 'drains'>, mon
 }
 
 /** One line that says which counted drains went into the DPS. */
-export function countedDrainsNote(r: DefenceReductions): string {
+function countedDrainsNote(r: DefenceReductions): string {
   const parts = [
     r.dwhHits ? `${r.dwhHits} Dragon warhammer hit(s)` : '',
     r.elderMaulHits ? `${r.elderMaulHits} Elder maul hit(s)` : '',
     r.bgsDamage ? `${r.bgsDamage} Bandos godsword damage` : '',
   ].filter(Boolean);
   return `Counted drains on this target are in the DPS: ${parts.join(', ')}. Pass manual drains to replace them.`;
+}
+
+/**
+ * A monster with its defence drains: the manual ones, or else the drains that the plugin counted on it.
+ * `drainNotes` names the counted drains when they went in.
+ */
+export function resolveMonsterWithDrains(
+  spec: { id?: number; name?: string; version?: string },
+  snap: Pick<Snapshot, 'target' | 'drains'>,
+  manual?: DefenceReductions,
+): { monster: Monster; drainNotes: string[] } {
+  const counted = manual ? undefined : countedReductions(snap, resolveMonster(spec));
+  return {
+    monster: resolveMonster({ ...spec, reductions: manual ?? counted }),
+    drainNotes: counted ? [countedDrainsNote(counted)] : [],
+  };
 }
 
 /** Defence level before and after reductions (engine applies boss-specific floors, e.g. Nex 250). */

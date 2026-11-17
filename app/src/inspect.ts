@@ -8,7 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, basename, join, resolve } from 'node:path';
 import * as z from 'zod/v4';
 import {
-  buildPlayer, calculate, countedReductions, describeLoadout, findItem, resolveMonster,
+  buildPlayer, calculate, describeLoadout, findItem, resolveMonsterWithDrains,
 } from './calc';
 import { bridgeFile, getSnapshot, Snapshot } from './snapshot';
 
@@ -79,8 +79,7 @@ async function printOnce() {
       ? { id: snap.target.id, name: snap.target.name }
       : { name: 'Abyssal demon' };
   // The drains that the plugin counted on this monster go into the DPS, as in the MCP tools.
-  const counted = countedReductions(snap, resolveMonster(spec));
-  const monster = resolveMonster({ ...spec, reductions: counted });
+  const { monster, drainNotes } = resolveMonsterWithDrains(spec, snap);
   const { player, notes } = buildPlayer(snap, monster);
   const l = describeLoadout(player);
   const r = calculate(player, monster);
@@ -94,7 +93,7 @@ async function printOnce() {
   if (snap.source === 'dps-bridge') await printV2(snap);
   const d = snap.drains;
   console.log('Drains   ', d
-    ? `DWH hits ${d.dwhHits} | Elder maul hits ${d.elderMaulHits} | BGS damage ${d.bgsDamage} (on #${d.targetId})${counted ? '' : ', not in this DPS'}`
+    ? `DWH hits ${d.dwhHits} | Elder maul hits ${d.elderMaulHits} | BGS damage ${d.bgsDamage} (on #${d.targetId})${drainNotes.length ? '' : ', not in this DPS'}`
     : '(no counted target)');
   console.log(`DPS vs ${monster.name}${monster.version ? ` (${monster.version})` : ''}: ${r.dps}  max ${r.maxHit}  acc ${r.accuracyPct}%  ttk ${r.avgTtkSeconds}s`);
   for (const n of notes) console.log('  note:', n);
