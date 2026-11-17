@@ -23,6 +23,12 @@ updates:
     directory: "/plugin"
     schedule:
       interval: "monthly"
+    # Stay on the Gradle major that RuneLite's example-plugin template uses (8.x).
+    # Gradle 9 fails the test task: the template's DpsBridgePluginTest is a launcher, not a test.
+    # Move to 9 when runelite/example-plugin does.
+    ignore:
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "pip"
     directory: "/evals"
