@@ -34,3 +34,9 @@ updates:
     directory: "/evals"
     schedule:
       interval: "monthly"
+    # CI does not run evals/, so a green PR here proves nothing. mcp 2.x removed
+    # streamablehttp_client, which evals/connections.py imports. Stay on 1.x until the
+    # evals are migrated to the v2 API.
+    ignore:
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
