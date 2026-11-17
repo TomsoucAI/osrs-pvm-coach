@@ -49,13 +49,20 @@ import net.runelite.api.Player;
 import net.runelite.api.Prayer;
 import net.runelite.api.Skill;
 import net.runelite.api.StructComposition;
+import net.runelite.api.events.ActorDeath;
+import net.runelite.api.events.FakeXpDrop;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.NpcDespawned;
+import net.runelite.api.events.StatChanged;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -64,13 +71,14 @@ import net.runelite.client.util.Filepath;
 /**
  * Writes the player's combat state to ~/.runelite/plugin-data/dps_bridge/state.json so a local
  * MCP server can run DPS calculations on it. Writes the bank to bank.json in the same folder
- * each time the game sends the bank container. Read-only: never sends input to the game.
+ * each time the game sends the bank container. Counts the player's own landed defence-drain specs
+ * on the current target as numbers in the state file. Read-only: never sends input to the game.
  */
 @Slf4j
 @PluginDescriptor(
 	name = "DPS Bridge",
 	internalName = "dps_bridge",
-	description = "Exports gear, inventory, bank, rune pouch, spellbook, boosted levels, prayers, attack style and target for an external DPS calculator",
+	description = "Exports gear, inventory, bank, rune pouch, spellbook, boosted levels, prayers, attack style, target and own spec drains for an external DPS calculator",
 	tags = {"dps", "calculator", "mcp", "combat"}
 )
 public class DpsBridgePlugin extends Plugin
@@ -96,10 +104,18 @@ public class DpsBridgePlugin extends Plugin
 	@Inject
 	private Gson gson;
 
+	@Inject
+	private ClientThread clientThread;
+
 	private ExecutorService writer;
 	private Filepath dir;
 	private String lastJson;
 	private JsonObject lastTarget;
+
+	private final SpecTracker specs = new SpecTracker();
+	private int specEnergy = -1;
+	private int lastHpXp = -1;
+	private int lastHpXpCycle = -1;
 
 	@Override
 	protected void startUp() throws Exception
@@ -121,6 +137,7 @@ public class DpsBridgePlugin extends Plugin
 		writer.shutdown();
 		lastJson = null;
 		lastTarget = null;
+		resetSpecs();
 	}
 
 	@Subscribe
@@ -129,6 +146,7 @@ public class DpsBridgePlugin extends Plugin
 		if (e.getGameState() == GameState.LOGIN_SCREEN)
 		{
 			lastTarget = null;
+			resetSpecs();
 			writeLoggedOut();
 		}
 	}
@@ -164,8 +182,12 @@ public class DpsBridgePlugin extends Plugin
 			t.addProperty("id", npc.getId());
 			t.addProperty("name", npc.getName());
 			lastTarget = t; // remembered after the kill so you can still ask about it
+			specs.target(npc.getIndex(), npc.getId());
 		}
 		j.add("target", lastTarget);
+
+		specs.gameTick(client.getTickCount());
+		j.add("drains", drains());
 
 		String json = gson.toJson(j);
 		if (json.equals(lastJson))
@@ -177,6 +199,138 @@ public class DpsBridgePlugin extends Plugin
 		JsonObject withTime = j.deepCopy();
 		withTime.addProperty("timestamp", System.currentTimeMillis());
 		write(STATE_FILE, gson.toJson(withTime));
+	}
+
+	// Own spec tracking, with the detection of the core Special Attack Counter: a drop of the
+	// special-attack energy is a spec, the worn weapon names it, and the NPC that the player
+	// interacts with is its target.
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged e)
+	{
+		if (e.getVarpId() != VarPlayerID.SA_ENERGY)
+		{
+			return;
+		}
+
+		int energy = e.getValue();
+		boolean dropped = specEnergy != -1 && energy < specEnergy;
+		specEnergy = energy;
+		if (!dropped)
+		{
+			return;
+		}
+
+		// This event runs before the player and NPC update, so getInteracting() is too early here.
+		// invokeLater runs after the tick counter increments, so take the tick now.
+		final int tick = client.getTickCount();
+		clientThread.invokeLater(() ->
+		{
+			SpecTracker.Weapon weapon = specWeapon();
+			Player me = client.getLocalPlayer();
+			Actor target = me == null ? null : me.getInteracting();
+			if (weapon == null || !(target instanceof NPC))
+			{
+				return;
+			}
+
+			NPC npc = (NPC) target;
+			specs.target(npc.getIndex(), npc.getId());
+			specs.specUsed(weapon, tick, lastHpXpCycle == client.getGameCycle());
+		});
+	}
+
+	@Subscribe
+	public void onHitsplatApplied(HitsplatApplied e)
+	{
+		// isMine: only the player's own hitsplats count
+		if (e.getHitsplat().isMine() && e.getActor() instanceof NPC)
+		{
+			specs.ownHitsplat(((NPC) e.getActor()).getIndex(), e.getHitsplat().getAmount(), client.getTickCount());
+		}
+	}
+
+	@Subscribe
+	public void onStatChanged(StatChanged e)
+	{
+		if (e.getSkill() == Skill.HITPOINTS)
+		{
+			if (e.getXp() > lastHpXp)
+			{
+				lastHpXpCycle = client.getGameCycle();
+			}
+			lastHpXp = e.getXp();
+		}
+	}
+
+	// At 200M Hitpoints xp the game sends a fake xp drop and no stat change.
+	@Subscribe
+	public void onFakeXpDrop(FakeXpDrop e)
+	{
+		if (e.getSkill() == Skill.HITPOINTS)
+		{
+			lastHpXpCycle = client.getGameCycle();
+		}
+	}
+
+	@Subscribe
+	public void onNpcDespawned(NpcDespawned e)
+	{
+		specs.npcGone(e.getNpc().getIndex());
+	}
+
+	@Subscribe
+	public void onActorDeath(ActorDeath e)
+	{
+		if (e.getActor() instanceof NPC)
+		{
+			specs.npcGone(((NPC) e.getActor()).getIndex());
+		}
+	}
+
+	private SpecTracker.Weapon specWeapon()
+	{
+		ItemContainer worn = client.getItemContainer(InventoryID.WORN);
+		Item weapon = worn == null ? null : worn.getItem(EquipmentInventorySlot.WEAPON.getSlotIdx());
+		if (weapon == null)
+		{
+			return null;
+		}
+
+		switch (weapon.getId())
+		{
+			case ItemID.DRAGON_WARHAMMER:
+			case ItemID.BH_DRAGON_WARHAMMER_CORRUPTED:
+				return SpecTracker.Weapon.DRAGON_WARHAMMER;
+			case ItemID.ELDER_MAUL:
+			case ItemID.ELDER_MAUL_ORNAMENT:
+				return SpecTracker.Weapon.ELDER_MAUL;
+			case ItemID.BGS:
+			case ItemID.BGSG:
+				return SpecTracker.Weapon.BANDOS_GODSWORD;
+			default:
+				return null;
+		}
+	}
+
+	private JsonObject drains()
+	{
+		if (!specs.hasTarget())
+		{
+			return null;
+		}
+
+		JsonObject d = new JsonObject();
+		d.addProperty("targetId", specs.getTargetId());
+		d.addProperty("dwhHits", specs.getDwhHits());
+		d.addProperty("elderMaulHits", specs.getElderMaulHits());
+		d.addProperty("bgsDamage", specs.getBgsDamage());
+		return d;
+	}
+
+	private void resetSpecs()
+	{
+		specs.reset();
+		specEnergy = -1;
 	}
 
 	// The game sends the bank container only while the bank is open, so the last file stays as

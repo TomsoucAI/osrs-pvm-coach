@@ -30,7 +30,7 @@ import type { EquipmentPiece, Player, PlayerEquipment } from '@/types/Player';
 import type { Monster } from '@/types/Monster';
 import type { PlayerCombatStyle } from '@/types/PlayerCombatStyle';
 import {
-  buildPlayer, calculate, findItem, resolveMonster, SLOTS, type DefenceReductions,
+  buildPlayer, calculate, countedDrainsNote, countedReductions, findItem, resolveMonster, SLOTS, type DefenceReductions,
 } from '../calc';
 import engineNamedItems from './engineNamedItems.json';
 import type { ItemStack, LiveState } from './liveState';
@@ -60,6 +60,7 @@ export interface BankModeRequest {
   monster: { name: string; version?: string } | { id: number };
   /** Omitted = all three combat styles. */
   style?: CombatStyle;
+  /** Omitted = the drains that the plugin counted on this monster. A value replaces them. */
   drains?: DefenceReductions;
 }
 
@@ -435,7 +436,8 @@ function describe(template: Player, c: Candidate, worn: Gear, monster: Monster):
 export function planBankMode(state: LiveState, request: BankModeRequest): BankModePlan {
   if (!state.loggedIn) throw new Error('The player is logged out: there is no live state to plan from. Log in with the DPS Bridge plugin on.');
 
-  const monster = resolveMonster({ ...request.monster, reductions: request.drains });
+  const counted = request.drains ? undefined : countedReductions(state, resolveMonster(request.monster));
+  const monster = resolveMonster({ ...request.monster, reductions: request.drains ?? counted });
   const {
     pool, worn, unknownWorn, notEquipment,
   } = collectOwned(state);
@@ -458,6 +460,7 @@ export function planBankMode(state: LiveState, request: BankModeRequest): BankMo
   }
 
   const notes = [...unknownWorn];
+  if (counted) notes.push(countedDrainsNote(counted));
   if (notEquipment) {
     notes.push(`${notEquipment} owned items in the inventory and bank are not equipment in the Wiki calculator's data (supplies, or very new gear); ignored.`);
   }

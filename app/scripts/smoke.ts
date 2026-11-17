@@ -108,4 +108,20 @@ const badStyle = await fixture.callTool({ name: 'osrs_best_owned_setup', argumen
 assert.equal(badStyle.isError, true, 'an unknown style should be rejected by the schema');
 await fixture.close();
 
+// Counted drains (state v2): the plugin counted 1 DWH hit on the current target, an Abyssal demon (defence 135 - floor(135 * 0.3) = 95)
+type Dps = { defence_level: { base: number; effective: number }; result: { dps: number }; notes: string[] };
+const drained = await connect('fixtures/spec-drains/state.json');
+const counted = (await call('osrs_calculate_dps', { response_format: 'json' }, drained)).structuredContent as Dps;
+assert.deepEqual(counted.defence_level, { base: 135, effective: 95 });
+assert.ok(counted.result.dps > 7.753, 'a counted DWH hit should raise the DPS');
+assert.ok(counted.notes.some((n) => /counted/i.test(n)), 'a note names the counted drains');
+
+const manual = (await call('osrs_calculate_dps', { defence_reductions: { dwh_hits: 0 }, response_format: 'json' }, drained)).structuredContent as Dps;
+assert.deepEqual(manual.defence_level, { base: 135, effective: 135 });
+assert.equal(manual.result.dps, 7.753);
+
+const other = (await call('osrs_calculate_dps', { monster: 'Vorkath', monster_version: 'Post-quest', response_format: 'json' }, drained)).structuredContent as Dps;
+assert.deepEqual(other.defence_level, { base: 214, effective: 214 });
+await drained.close();
+
 console.error('Smoke test passed');

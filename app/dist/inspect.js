@@ -312964,6 +312964,13 @@ function resolveMonster(opts) {
   }
   return monster;
 }
+function countedReductions(snap, monster) {
+  const d = snap.drains;
+  if (!d || !(d.dwhHits || d.elderMaulHits || d.bgsDamage)) return void 0;
+  const countedOn = monsters.find((m) => m.id === d.targetId)?.name ?? (snap.target?.id === d.targetId ? snap.target.name : void 0);
+  if (!countedOn || norm(countedOn) !== norm(monster.name)) return void 0;
+  return { dwhHits: d.dwhHits, elderMaulHits: d.elderMaulHits, bgsDamage: d.bgsDamage };
+}
 function itemFromNameOrId(v) {
   if (typeof v === "number" || /^\d+$/.test(v)) {
     const item2 = findItem(Number(v));
@@ -313137,13 +313144,19 @@ var import_websocket_server = __toESM(require_websocket_server(), 1);
 var wrapper_default = import_websocket.default;
 
 // src/snapshot.ts
+var countedDrainsSchema = object({
+  targetId: number2().int(),
+  dwhHits: number2().int(),
+  elderMaulHits: number2().int(),
+  bgsDamage: number2().int()
+});
 var bridgeFile = () => process.env.DPS_BRIDGE_FILE ?? join(homedir(), ".runelite", "plugin-data", "dps_bridge", "state.json");
 async function readBridge() {
   try {
     await stat(bridgeFile());
     const data = JSON.parse(await readFile(bridgeFile(), "utf8"));
     if (data.loggedIn === false) return null;
-    return { ...data, source: "dps-bridge" };
+    return { ...data, drains: countedDrainsSchema.nullable().catch(null).parse(data.drains ?? null), source: "dps-bridge" };
   } catch {
     return null;
   }
@@ -313252,7 +313265,9 @@ async function printOnce() {
 \u2717 ${e.message}`);
     return;
   }
-  const monster = monsterName ? resolveMonster({ name: monsterName }) : snap.target ? resolveMonster({ id: snap.target.id, name: snap.target.name }) : resolveMonster({ name: "Abyssal demon" });
+  const spec = monsterName ? { name: monsterName } : snap.target ? { id: snap.target.id, name: snap.target.name } : { name: "Abyssal demon" };
+  const counted = countedReductions(snap, resolveMonster(spec));
+  const monster = resolveMonster({ ...spec, reductions: counted });
   const { player, notes } = buildPlayer(snap, monster);
   const l = describeLoadout(player);
   const r = calculate(player, monster);
@@ -313264,6 +313279,8 @@ async function printOnce() {
   console.log("Style   ", l.style, l.spell ? `| spell ${l.spell}` : "");
   console.log("Target  ", snap.target ? `${snap.target.name} (#${snap.target.id})` : "(none, using default)", "| slayer task:", l.onSlayerTask);
   if (snap.source === "dps-bridge") await printV2(snap);
+  const d = snap.drains;
+  console.log("Drains   ", d ? `DWH hits ${d.dwhHits} | Elder maul hits ${d.elderMaulHits} | BGS damage ${d.bgsDamage} (on #${d.targetId})${counted ? "" : ", not in this DPS"}` : "(no counted target)");
   console.log(`DPS vs ${monster.name}${monster.version ? ` (${monster.version})` : ""}: ${r.dps}  max ${r.maxHit}  acc ${r.accuracyPct}%  ttk ${r.avgTtkSeconds}s`);
   for (const n of notes) console.log("  note:", n);
 }

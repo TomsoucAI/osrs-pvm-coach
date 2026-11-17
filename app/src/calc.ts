@@ -115,6 +115,28 @@ export function resolveMonster(opts: {
   return monster;
 }
 
+/**
+ * The counted drains as reductions for `monster`, or undefined when there are none for it.
+ * The plugin counts on a game NPC id and the phases of one boss share a name, so the name decides.
+ */
+export function countedReductions(snap: Pick<Snapshot, 'target' | 'drains'>, monster: Monster): DefenceReductions | undefined {
+  const d = snap.drains;
+  if (!d || !(d.dwhHits || d.elderMaulHits || d.bgsDamage)) return undefined;
+  const countedOn = monsters.find((m) => m.id === d.targetId)?.name ?? (snap.target?.id === d.targetId ? snap.target.name : undefined);
+  if (!countedOn || norm(countedOn) !== norm(monster.name)) return undefined;
+  return { dwhHits: d.dwhHits, elderMaulHits: d.elderMaulHits, bgsDamage: d.bgsDamage };
+}
+
+/** One line that says which counted drains went into the DPS. */
+export function countedDrainsNote(r: DefenceReductions): string {
+  const parts = [
+    r.dwhHits ? `${r.dwhHits} Dragon warhammer hit(s)` : '',
+    r.elderMaulHits ? `${r.elderMaulHits} Elder maul hit(s)` : '',
+    r.bgsDamage ? `${r.bgsDamage} Bandos godsword damage` : '',
+  ].filter(Boolean);
+  return `Counted drains on this target are in the DPS: ${parts.join(', ')}. Pass manual drains to replace them.`;
+}
+
 /** Defence level before and after reductions (engine applies boss-specific floors, e.g. Nex 250). */
 export function defenceAfterReductions(monster: Monster) {
   return { base: monster.skills.def, effective: scaleMonster(monster).skills.def };
