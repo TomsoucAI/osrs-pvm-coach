@@ -330554,6 +330554,28 @@ function resolveMonster(opts) {
   }
   return monster;
 }
+function countedReductions(snap, monster) {
+  const d = snap.drains;
+  if (!d || !(d.dwhHits || d.elderMaulHits || d.bgsDamage)) return void 0;
+  const countedOn = monsters.find((m) => m.id === d.targetId)?.name ?? (snap.target?.id === d.targetId ? snap.target.name : void 0);
+  if (!countedOn || norm(countedOn) !== norm(monster.name)) return void 0;
+  return { dwhHits: d.dwhHits, elderMaulHits: d.elderMaulHits, bgsDamage: d.bgsDamage };
+}
+function countedDrainsNote(r) {
+  const parts = [
+    r.dwhHits ? `${r.dwhHits} Dragon warhammer hit(s)` : "",
+    r.elderMaulHits ? `${r.elderMaulHits} Elder maul hit(s)` : "",
+    r.bgsDamage ? `${r.bgsDamage} Bandos godsword damage` : ""
+  ].filter(Boolean);
+  return `Counted drains on this target are in the DPS: ${parts.join(", ")}. Pass manual drains to replace them.`;
+}
+function resolveMonsterWithDrains(spec, snap, manual) {
+  const counted = manual ? void 0 : countedReductions(snap, resolveMonster(spec));
+  return {
+    monster: resolveMonster({ ...spec, reductions: manual ?? counted }),
+    drainNotes: counted ? [countedDrainsNote(counted)] : []
+  };
+}
 function defenceAfterReductions(monster) {
   return { base: monster.skills.def, effective: scaleMonster(monster).skills.def };
 }
@@ -330730,13 +330752,19 @@ var import_websocket_server = __toESM(require_websocket_server(), 1);
 var wrapper_default = import_websocket.default;
 
 // src/snapshot.ts
+var countedDrainsSchema = object({
+  targetId: number2().int(),
+  dwhHits: number2().int(),
+  elderMaulHits: number2().int(),
+  bgsDamage: number2().int()
+});
 var bridgeFile = () => process.env.DPS_BRIDGE_FILE ?? join(homedir(), ".runelite", "plugin-data", "dps_bridge", "state.json");
 async function readBridge() {
   try {
     await stat(bridgeFile());
     const data = JSON.parse(await readFile(bridgeFile(), "utf8"));
     if (data.loggedIn === false) return null;
-    return { ...data, source: "dps-bridge" };
+    return { ...data, drains: countedDrainsSchema.nullable().catch(null).parse(data.drains ?? null), source: "dps-bridge" };
   } catch {
     return null;
   }
@@ -331335,7 +331363,7 @@ function describe2(template, c, worn, monster) {
 }
 function planBankMode(state, request) {
   if (!state.loggedIn) throw new Error("The player is logged out: there is no live state to plan from. Log in with the DPS Bridge plugin on.");
-  const monster = resolveMonster({ ...request.monster, reductions: request.drains });
+  const { monster, drainNotes } = resolveMonsterWithDrains(request.monster, state, request.drains);
   const {
     pool,
     worn,
@@ -331355,7 +331383,7 @@ function planBankMode(state, request) {
     const ranked = withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster));
     styles[combat] = ranked.length ? { setups: ranked.map((c) => describe2(template, c, worn, monster)).sort((a, b) => b.dps - a.dps) } : { unavailable: `No owned setup can attack with ${combat}.` };
   }
-  const notes = [...unknownWorn];
+  const notes = [...unknownWorn, ...drainNotes];
   if (notEquipment) {
     notes.push(`${notEquipment} owned items in the inventory and bank are not equipment in the Wiki calculator's data (supplies, or very new gear); ignored.`);
   }
@@ -331406,12 +331434,7 @@ var loggedInState = object({
   inventory: array(itemStack).default([]),
   runePouch: array(object({ runeItemId: number2().int(), quantity: number2().int() })).default([]),
   spellbook: _enum(["standard", "ancient", "lunar", "arceuus"]).nullable().default(null),
-  drains: object({
-    targetId: number2().int(),
-    dwhHits: number2().int(),
-    elderMaulHits: number2().int(),
-    bgsDamage: number2().int()
-  }).nullable().default(null)
+  drains: countedDrainsSchema.nullable().default(null)
 });
 var loggedOutState = object({
   version: number2().int().min(1).max(2),
@@ -331494,7 +331517,7 @@ var monsterFields = {
     emberlight_hits: number2().int().min(0).max(10).optional().describe("Successful Emberlight specs"),
     accursed: boolean2().optional().describe("Accursed sceptre spec active (-15% defence and magic)"),
     vulnerability: boolean2().optional().describe("Vulnerability spell active (-10% defence)")
-  }).optional().describe('Defence drains landed before attacking, applied in order: accursed/vulnerability, elder maul, DWH, arclight/emberlight, BGS. Boss defence floors are applied automatically. e.g. {"dwh_hits": 2}')
+  }).optional().describe('Defence drains landed before attacking, applied in order: accursed/vulnerability, elder maul, DWH, arclight/emberlight, BGS. Boss defence floors are applied automatically. e.g. {"dwh_hits": 2}. Omit to use the drains that the DPS Bridge plugin counted on this monster (own landed DWH, Elder maul and BGS specs); a value replaces them, e.g. {"dwh_hits": 0} for no drains.')
 };
 var overrideFields = {
   prayers: array(string2()).max(5).optional().describe(`Replace the active prayers; [] means none. Values: ${VALID.prayers.join(", ")}`),
@@ -331522,12 +331545,11 @@ var toReductions = (r) => r ? {
   vulnerability: r.vulnerability
 } : void 0;
 function pickMonster(snap, a) {
-  const reductions = toReductions(a.defence_reductions);
-  if (a.monster_id !== void 0 || a.monster) {
-    return resolveMonster({ id: a.monster_id, name: a.monster, version: a.monster_version, reductions });
-  }
-  if (snap.target) return resolveMonster({ id: snap.target.id, name: snap.target.name, reductions });
-  throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Vorkath"), or ask the player to attack the NPC first.');
+  let spec;
+  if (a.monster_id !== void 0 || a.monster) spec = { id: a.monster_id, name: a.monster, version: a.monster_version };
+  else if (snap.target) spec = { id: snap.target.id, name: snap.target.name };
+  else throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Vorkath"), or ask the player to attack the NPC first.');
+  return resolveMonsterWithDrains(spec, snap, toReductions(a.defence_reductions));
 }
 var monsterLabel = (m) => `${m.name}${m.version ? ` (${m.version})` : ""}`;
 function sourceWarnings(snap) {
@@ -331606,11 +331628,11 @@ Use osrs_compare_setups to rank several variants at once; osrs_search_monsters i
     annotations: READ_ONLY
   }, async (a) => {
     const snap = await getSnapshot();
-    const monster = pickMonster(snap, a);
+    const { monster, drainNotes } = pickMonster(snap, a);
     const { player, notes } = buildPlayer(snap, monster, toOverrides(a));
     const result = calculate(player, monster);
     const loadout = describeLoadout(player);
-    const allNotes = [...sourceWarnings(snap), ...notes];
+    const allNotes = [...sourceWarnings(snap), ...drainNotes, ...notes];
     const defence = defenceAfterReductions(monster);
     const data = {
       monster: monsterLabel(monster),
@@ -331650,7 +331672,7 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
     annotations: READ_ONLY
   }, async (a) => {
     const snap = await getSnapshot();
-    const monster = pickMonster(snap, a);
+    const { monster, drainNotes } = pickMonster(snap, a);
     const rows = [{ label: "current" }, ...a.variants].map((v) => {
       try {
         const m = v.defence_reductions ? resolveMonster({ id: monster.id, reductions: toReductions(v.defence_reductions) }) : monster;
@@ -331669,7 +331691,7 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
       }
     });
     rows.sort((x, y) => (y.dps ?? -1) - (x.dps ?? -1));
-    const notes = sourceWarnings(snap);
+    const notes = [...sourceWarnings(snap), ...drainNotes];
     const data = { monster: monsterLabel(monster), monster_id: monster.id, results: rows, notes };
     return reply(a.response_format, data, () => [
       `# Setups vs ${monsterLabel(monster)}`,

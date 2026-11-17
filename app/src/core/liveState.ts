@@ -4,7 +4,7 @@
 //   bank.json:  the last bank snapshot. The plugin writes it only while the bank is open, so it can be absent.
 import { readFile } from 'node:fs/promises';
 import * as z from 'zod/v4';
-import type { Snapshot } from '../snapshot';
+import { countedDrainsSchema, type Snapshot } from '../snapshot';
 
 const itemStack = z.object({ id: z.number().int(), quantity: z.number().int() });
 const skillMap = z.partialRecord(
@@ -35,12 +35,7 @@ const loggedInState = z.object({
   inventory: z.array(itemStack).default([]),
   runePouch: z.array(z.object({ runeItemId: z.number().int(), quantity: z.number().int() })).default([]),
   spellbook: z.enum(['standard', 'ancient', 'lunar', 'arceuus']).nullable().default(null),
-  drains: z.object({
-    targetId: z.number().int(),
-    dwhHits: z.number().int(),
-    elderMaulHits: z.number().int(),
-    bgsDamage: z.number().int(),
-  }).nullable().default(null),
+  drains: countedDrainsSchema.nullable().default(null),
 });
 
 const loggedOutState = z.object({

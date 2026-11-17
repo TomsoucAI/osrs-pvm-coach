@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # CI actions are pinned to commit SHAs; Dependabot keeps the SHA and the version comment current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # A Dependabot PR here changes package-lock.json only. Before merge, rebuild and commit
+  # app/dist/ (npm test in app/), because users run the committed bundle.
+  - package-ecosystem: "npm"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "gradle"
+    directory: "/plugin"
+    schedule:
+      interval: "monthly"
+
+  - package-ecosystem: "pip"
+    directory: "/evals"
+    schedule:
+      interval: "monthly"

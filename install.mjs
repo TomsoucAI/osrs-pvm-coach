@@ -48,7 +48,7 @@ if (!javaOk) {
     : '    Install:  brew install --cask temurin@21   (macOS)  or your distro\'s openjdk-21');
 }
 has('git') ? ok('git') : warn(WIN ? 'git missing → winget install Git.Git' : 'git missing');
-if (!existsSync(MCP_ENTRY)) throw new Error(`Missing ${MCP_ENTRY}. Run this from the osrs-dps-mcp folder.`);
+if (!existsSync(MCP_ENTRY)) throw new Error(`Missing ${MCP_ENTRY}. Run this from the osrs-pvm-coach folder.`);
 ok('MCP bundle found');
 
 // ── 2. Plugin-dev rules ──────────────────────────────────────

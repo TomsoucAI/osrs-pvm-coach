@@ -1,5 +1,56 @@
+# Dependencies
 node_modules/
+
+# Wiki DPS engine, cloned by app/setup.mjs (GPL, not ours to commit)
 vendor/
+
+# app/dist/ is committed on purpose: users run app/dist/index.js without a build.
+# Only the test bundle is ignored. Never add a bare "dist" line.
 app/dist/*.test.js
+
+# Gradle (the wrapper in plugin/gradle/wrapper/ stays committed: never add "*.jar")
 plugin/build/
 plugin/.gradle/
+.gradletasknamecache
+
+# Java
+*.class
+hs_err_pid*
+replay_pid*
+
+# Python (evals/)
+__pycache__/
+*.py[codz]
+.venv/
+venv/
+.pytest_cache/
+
+# Node logs and caches
+*.log
+npm-debug.log*
+*.tsbuildinfo
+*.tgz
+coverage/
+
+# Secrets and local environment (evals need ANTHROPIC_API_KEY)
+.env
+.env.*
+!.env.example
+
+# RuneLite account files: never commit, even by mistake
+credentials.properties
+jagex-accounts.dat
+
+# Claude Code personal files
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Editors and OS
+.idea/
+*.iml
+*.iws
+out/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini

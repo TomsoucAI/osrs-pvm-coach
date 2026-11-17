@@ -1,0 +1,12 @@
+# The maintainer reviews every PR. The paths below run code on contributors' machines
+# or in CI, so they get the closest review (see CONTRIBUTING.md).
+*                    @TomsoucAI
+/.github/            @TomsoucAI
+/.claude/            @TomsoucAI
+/plugin/tools/       @TomsoucAI
+/plugin/gradle/      @TomsoucAI
+/plugin/gradlew      @TomsoucAI
+/plugin/gradlew.bat  @TomsoucAI
+/install.mjs         @TomsoucAI
+/app/package.json    @TomsoucAI
+/app/setup.mjs       @TomsoucAI
