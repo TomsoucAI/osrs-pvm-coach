@@ -4,9 +4,23 @@
 
 Ask Claude "what's my DPS on Vorkath?" and get the answer from your **live** RuneLite gear, boosted levels (potions), active prayers, attack style and current target, calculated by the **OSRS Wiki DPS calculator engine** (`weirdgloop/osrs-dps-calc`), the same maths as https://tools.runescape.wiki/osrs-dps.
 
-```
-RuneLite ── DPS Bridge plugin ──> ~/.runelite/plugin-data/dps_bridge/state.json ──> MCP server (Wiki calc engine) ──> Claude
-          └─ (fallback) WikiSync plugin websocket :37767 ──────────────────┘
+```mermaid
+flowchart LR
+    subgraph PC["Your PC"]
+        RL["RuneLite client"]
+        DB["DPS Bridge plugin<br/>(read-only)"]
+        WS["WikiSync plugin<br/>(fallback)"]
+        SJ[("state.json<br/>~/.runelite/plugin-data/dps_bridge/")]
+        MCP["MCP server<br/>OSRS Wiki DPS engine"]
+    end
+    C["Claude<br/>(Code or Desktop)"]
+
+    RL --> DB
+    DB -->|writes on change| SJ
+    SJ -->|reads| MCP
+    RL --> WS
+    WS -.->|"WebSocket :37767"| MCP
+    MCP -->|"DPS, max hit, TTK"| C
 ```
 
 ## Tools
