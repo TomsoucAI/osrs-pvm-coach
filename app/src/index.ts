@@ -8,6 +8,7 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
 import {
   buildPlayer, calculate, defenceAfterReductions, DefenceReductions, describeLoadout, Overrides, resolveMonster,
+  resolveMonsterWithDrains,
   searchMonsters, VALID,
 } from './calc';
 import { bridgeFile, getSnapshot, Snapshot } from './snapshot';
@@ -49,7 +50,7 @@ const monsterFields = {
     accursed: z.boolean().optional().describe('Accursed sceptre spec active (-15% defence and magic)'),
     vulnerability: z.boolean().optional().describe('Vulnerability spell active (-10% defence)'),
   }).optional()
-    .describe('Defence drains landed before attacking, applied in order: accursed/vulnerability, elder maul, DWH, arclight/emberlight, BGS. Boss defence floors are applied automatically. e.g. {"dwh_hits": 2}'),
+    .describe('Defence drains landed before attacking, applied in order: accursed/vulnerability, elder maul, DWH, arclight/emberlight, BGS. Boss defence floors are applied automatically. e.g. {"dwh_hits": 2}. Omit to use the drains that the DPS Bridge plugin counted on this monster (own landed DWH, Elder maul and BGS specs); a value replaces them, e.g. {"dwh_hits": 0} for no drains.'),
 };
 
 const overrideFields = {
@@ -89,13 +90,14 @@ const toReductions = (r?: ReductionArgs): DefenceReductions | undefined => (r ? 
 
 function pickMonster(snap: Snapshot, a: {
   monster?: string; monster_version?: string; monster_id?: number; defence_reductions?: ReductionArgs;
-}): Monster {
-  const reductions = toReductions(a.defence_reductions);
-  if (a.monster_id !== undefined || a.monster) {
-    return resolveMonster({ id: a.monster_id, name: a.monster, version: a.monster_version, reductions });
-  }
-  if (snap.target) return resolveMonster({ id: snap.target.id, name: snap.target.name, reductions });
-  throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Vorkath"), or ask the player to attack the NPC first.');
+}): { monster: Monster; drainNotes: string[] } {
+  let spec;
+  if (a.monster_id !== undefined || a.monster) spec = { id: a.monster_id, name: a.monster, version: a.monster_version };
+  else if (snap.target) spec = { id: snap.target.id, name: snap.target.name };
+  else throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Vorkath"), or ask the player to attack the NPC first.');
+
+  // Manual defence_reductions replace the drains that the plugin counted on this monster.
+  return resolveMonsterWithDrains(spec, snap, toReductions(a.defence_reductions));
 }
 
 const monsterLabel = (m: Monster) => `${m.name}${m.version ? ` (${m.version})` : ''}`;
@@ -181,11 +183,11 @@ Use osrs_compare_setups to rank several variants at once; osrs_search_monsters i
     annotations: READ_ONLY,
   }, async (a) => {
     const snap = await getSnapshot();
-    const monster = pickMonster(snap, a);
+    const { monster, drainNotes } = pickMonster(snap, a);
     const { player, notes } = buildPlayer(snap, monster, toOverrides(a));
     const result = calculate(player, monster);
     const loadout = describeLoadout(player);
-    const allNotes = [...sourceWarnings(snap), ...notes];
+    const allNotes = [...sourceWarnings(snap), ...drainNotes, ...notes];
     const defence = defenceAfterReductions(monster);
     const data = {
       monster: monsterLabel(monster), monster_id: monster.id, defence_level: defence, result, loadout, notes: allNotes,
@@ -220,7 +222,7 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
     annotations: READ_ONLY,
   }, async (a) => {
     const snap = await getSnapshot();
-    const monster = pickMonster(snap, a);
+    const { monster, drainNotes } = pickMonster(snap, a);
     type Row = { label: string; defence?: number; dps?: number; max_hit?: number; accuracy_pct?: number; avg_ttk_seconds?: number | null; error?: string };
     const rows: Row[] = [{ label: 'current' } as OverrideArgs & { label: string; defence_reductions?: ReductionArgs }, ...a.variants].map((v) => {
       try {
@@ -238,7 +240,7 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
       }
     });
     rows.sort((x, y) => (y.dps ?? -1) - (x.dps ?? -1));
-    const notes = sourceWarnings(snap);
+    const notes = [...sourceWarnings(snap), ...drainNotes];
     const data = { monster: monsterLabel(monster), monster_id: monster.id, results: rows, notes };
     return reply(a.response_format, data, () => [
       `# Setups vs ${monsterLabel(monster)}`,

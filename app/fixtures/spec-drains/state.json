@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "loggedIn": true,
+  "playerName": "SampleTom",
+  "equipment": {
+    "head": 10828,
+    "cape": 6570,
+    "neck": 6585,
+    "weapon": 4151,
+    "body": 10551,
+    "shield": 12954,
+    "legs": 1079,
+    "hands": 7462,
+    "feet": 11840,
+    "ring": 11773,
+    "ammo": null
+  },
+  "realLevels": {
+    "atk": 99,
+    "str": 99,
+    "def": 99,
+    "ranged": 99,
+    "magic": 99,
+    "prayer": 99,
+    "hp": 99,
+    "mining": 70,
+    "herblore": 90,
+    "farming": 80
+  },
+  "boostedLevels": {
+    "atk": 118,
+    "str": 118,
+    "def": 118,
+    "ranged": 99,
+    "magic": 99,
+    "prayer": 95,
+    "hp": 99,
+    "mining": 70,
+    "herblore": 90,
+    "farming": 80
+  },
+  "prayers": [
+    "PIETY",
+    "PROTECT_FROM_MELEE"
+  ],
+  "attackStyleIndex": 1,
+  "castingMode": 0,
+  "weaponCategory": 20,
+  "styleSlots": [
+    "Accurate",
+    "Controlled",
+    "Other",
+    "Defensive",
+    "Casting",
+    "Defensive Casting"
+  ],
+  "buffs": {
+    "onSlayerTask": true,
+    "inWilderness": false,
+    "kandarinDiary": false,
+    "chargeSpell": false
+  },
+  "target": {
+    "id": 415,
+    "name": "Abyssal demon"
+  },
+  "timestamp": 1794791879541,
+  "inventory": [],
+  "runePouch": [],
+  "spellbook": "standard",
+  "drains": {
+    "targetId": 415,
+    "dwhHits": 1,
+    "elderMaulHits": 0,
+    "bgsDamage": 0
+  }
+}
