@@ -11,7 +11,9 @@ import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import {
   buildPlayer, calculate, findItem, resolveMonster, searchMonsters, SLOTS,
 } from '../calc';
-import { planBankMode, type CombatStyle, type Slot } from '../core/bankMode';
+import {
+  combatStyleOf, planBankMode, type CombatStyle, type Slot,
+} from '../core/bankMode';
 import { readState, type LiveState } from '../core/liveState';
 import { phaseUnavailable } from '../core/phaseRules';
 
@@ -45,11 +47,10 @@ const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
 };
 /** Windows fires 2 or 3 change events for one save. */
 const CHANGE_DEBOUNCE_MS = 100;
+const WATCH_RETRY_MS = 1000;
 const SECURITY_HEADERS = {
   'Content-Security-Policy': "default-src 'self'; frame-ancestors 'none'",
   'X-Content-Type-Options': 'nosniff',
@@ -92,8 +93,8 @@ function summarize(state: LiveState, monsterQuery: { name: string; version?: str
   if (monsterQuery) {
     const monster = resolveMonster(monsterQuery);
     const { player } = buildPlayer(state, monster);
-    const type = player.style?.type;
-    const unavailable = phaseUnavailable(monster, type === 'magic' || type === 'ranged' ? type : 'melee');
+    const combat = combatStyleOf(player.style);
+    const unavailable = combat && phaseUnavailable(monster, combat);
     if (unavailable) now = { unavailable };
     else {
       const {
@@ -212,16 +213,35 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
 
   // The page gets a small "changed" event and fetches the plan again: one code path for data.
   let debounce: NodeJS.Timeout | undefined;
+  const pushChanged = () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => {
+      for (const stream of streams) stream.write('event: changed\ndata: {}\n\n');
+    }, CHANGE_DEBOUNCE_MS);
+  };
   const watched = new Set([options.stateFile, options.bankFile].map((f) => basename(f)));
-  const watchers: FSWatcher[] = [...new Set([options.stateFile, options.bankFile].map((f) => dirname(f)))].map((dir) => (
-    watch(dir, (_event, filename) => {
-      if (filename !== null && !watched.has(filename)) return;
-      clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        for (const stream of streams) stream.write('event: changed\ndata: {}\n\n');
-      }, CHANGE_DEBOUNCE_MS);
-    })
-  ));
+  const watchers = new Set<FSWatcher>();
+  const retries = new Map<string, NodeJS.Timeout>();
+  // The plugin creates its folder on the first login. Until the folder exists, try again; then push once,
+  // because the files can be there already.
+  const watchFolder = (dir: string, isRetry: boolean) => {
+    const retry = () => retries.set(dir, setTimeout(() => watchFolder(dir, true), WATCH_RETRY_MS));
+    try {
+      const watcher = watch(dir, (_event, filename) => {
+        if (filename === null || watched.has(filename)) pushChanged();
+      });
+      watcher.on('error', () => {
+        watcher.close();
+        watchers.delete(watcher);
+        retry();
+      });
+      watchers.add(watcher);
+      if (isRetry) pushChanged();
+    } catch {
+      retry();
+    }
+  };
+  for (const dir of new Set([options.stateFile, options.bankFile].map((f) => dirname(f)))) watchFolder(dir, false);
 
   await new Promise<void>((done, fail) => {
     server.once('error', fail);
@@ -236,6 +256,7 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
     port,
     close: () => new Promise<void>((done) => {
       clearTimeout(debounce);
+      for (const retry of retries.values()) clearTimeout(retry);
       for (const watcher of watchers) watcher.close();
       for (const stream of streams) stream.end();
       server.close(() => done());

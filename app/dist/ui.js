@@ -315463,11 +315463,10 @@ var COMBAT_STYLES2 = ["melee", "ranged", "magic"];
 var CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png"
+  ".css": "text/css; charset=utf-8"
 };
 var CHANGE_DEBOUNCE_MS = 100;
+var WATCH_RETRY_MS = 1e3;
 var SECURITY_HEADERS = {
   "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'",
   "X-Content-Type-Options": "nosniff",
@@ -315513,8 +315512,8 @@ function summarize(state, monsterQuery) {
   if (monsterQuery) {
     const monster = resolveMonster(monsterQuery);
     const { player } = buildPlayer(state, monster);
-    const type = player.style?.type;
-    const unavailable = phaseUnavailable(monster, type === "magic" || type === "ranged" ? type : "melee");
+    const combat = combatStyleOf(player.style);
+    const unavailable = combat && phaseUnavailable(monster, combat);
     if (unavailable) now = { unavailable };
     else {
       const {
@@ -315628,14 +315627,33 @@ async function startUiServer(options) {
   });
   server.maxConnections = MAX_CONNECTIONS;
   let debounce;
-  const watched = new Set([options.stateFile, options.bankFile].map((f) => basename(f)));
-  const watchers = [...new Set([options.stateFile, options.bankFile].map((f) => dirname(f)))].map((dir) => watch(dir, (_event, filename) => {
-    if (filename !== null && !watched.has(filename)) return;
+  const pushChanged = () => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
       for (const stream of streams) stream.write("event: changed\ndata: {}\n\n");
     }, CHANGE_DEBOUNCE_MS);
-  }));
+  };
+  const watched = new Set([options.stateFile, options.bankFile].map((f) => basename(f)));
+  const watchers = /* @__PURE__ */ new Set();
+  const retries = /* @__PURE__ */ new Map();
+  const watchFolder = (dir, isRetry) => {
+    const retry = () => retries.set(dir, setTimeout(() => watchFolder(dir, true), WATCH_RETRY_MS));
+    try {
+      const watcher = watch(dir, (_event, filename) => {
+        if (filename === null || watched.has(filename)) pushChanged();
+      });
+      watcher.on("error", () => {
+        watcher.close();
+        watchers.delete(watcher);
+        retry();
+      });
+      watchers.add(watcher);
+      if (isRetry) pushChanged();
+    } catch {
+      retry();
+    }
+  };
+  for (const dir of new Set([options.stateFile, options.bankFile].map((f) => dirname(f)))) watchFolder(dir, false);
   await new Promise((done, fail) => {
     server.once("error", fail);
     server.listen(options.port, "127.0.0.1", () => done());
@@ -315647,6 +315665,7 @@ async function startUiServer(options) {
     port: port2,
     close: () => new Promise((done) => {
       clearTimeout(debounce);
+      for (const retry of retries.values()) clearTimeout(retry);
       for (const watcher of watchers) watcher.close();
       for (const stream of streams) stream.end();
       server.close(() => done());

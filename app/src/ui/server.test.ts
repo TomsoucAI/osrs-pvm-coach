@@ -111,11 +111,10 @@ test('the monster search returns name and version', async () => {
   assert.ok(versions.includes('Far') && versions.includes('Nearby'), `got ${JSON.stringify(hits)}`);
 });
 
-test('a change to the state file pushes a "changed" event', async () => {
-  const stateFile = join(dir, 'fixture', 'state.json');
-  const state = JSON.parse(await readFile(stateFile, 'utf8'));
-  const events = await new Promise<string>((done, fail) => {
-    const req = request({ host: '127.0.0.1', port: server.port, path: '/api/events' }, (res) => {
+/** Opens the event stream, runs `change`, and gives what the stream sent up to the first "changed" event. */
+function eventsAfter(change: () => Promise<unknown>, on: UiServer = server): Promise<string> {
+  return new Promise<string>((done, fail) => {
+    const req = request({ host: '127.0.0.1', port: on.port, path: '/api/events' }, (res) => {
       assert.equal(res.statusCode, 200);
       assert.equal(res.headers['content-type'], 'text/event-stream');
       let seen = '';
@@ -127,15 +126,59 @@ test('a change to the state file pushes a "changed" event', async () => {
           done(seen);
         }
       });
-      // The stream is open: now change the file, as the plugin does on a gear swap.
-      state.equipment.weapon = 4587;
-      writeFile(stateFile, JSON.stringify(state)).catch(fail);
+      change().catch(fail);
     });
     req.on('error', fail);
     req.end();
   });
+}
+
+test('a change to the state file pushes a "changed" event', async () => {
+  const stateFile = join(dir, 'fixture', 'state.json');
+  const state = JSON.parse(await readFile(stateFile, 'utf8'));
+  // As the plugin does on a gear swap.
+  state.equipment.weapon = 4587;
+
+  const events = await eventsAfter(() => writeFile(stateFile, JSON.stringify(state)));
 
   assert.match(events, /event: changed\ndata: \{\}\n\n/);
+});
+
+test('a change to the bank file pushes a "changed" event', async () => {
+  const bankFile = join(dir, 'fixture', 'bank.json');
+  const bank = JSON.parse(await readFile(bankFile, 'utf8'));
+  bank.timestamp += 1;
+
+  const events = await eventsAfter(() => writeFile(bankFile, JSON.stringify(bank)));
+
+  assert.match(events, /event: changed/);
+});
+
+test('with no plugin folder yet, the server starts, answers 503, and pushes once the plugin writes its files', async () => {
+  const folder = join(dir, 'not-yet');
+  const early = await startUiServer({
+    port: 0, stateFile: join(folder, 'state.json'), bankFile: join(folder, 'bank.json'), pageDir: join(dir, 'page'),
+  });
+  try {
+    const reply = await send('/api/state', { on: early });
+    assert.equal(reply.status, 503);
+    assert.equal(typeof JSON.parse(reply.body).error, 'string');
+    assert.ok(!reply.body.includes('not-yet') && !reply.body.includes('    at '), reply.body);
+
+    const events = await eventsAfter(() => cp(join(dir, 'fixture'), folder, { recursive: true }), early);
+
+    assert.match(events, /event: changed/);
+    assert.equal((await send('/api/state', { on: early })).status, 200);
+  } finally {
+    await early.close();
+  }
+});
+
+test('a foreign request with a write method gets 403, like any foreign request', async () => {
+  for (const method of ['POST', 'OPTIONS']) {
+    const reply = await send('/api/state', { method, headers: { Host: `evil.example:${server.port}` } });
+    assert.equal(reply.status, 403, method);
+  }
 });
 
 test('a foreign Origin gets 403', async () => {
