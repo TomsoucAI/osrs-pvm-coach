@@ -1,6 +1,7 @@
 {
   "name": "osrs-dps-mcp-server",
   "version": "0.2.0",
+  "private": true,
   "description": "MCP server: live OSRS DPS from RuneLite using the OSRS Wiki DPS calculator engine",
   "main": "index.js",
   "scripts": {
