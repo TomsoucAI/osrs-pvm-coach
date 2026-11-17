@@ -88,8 +88,9 @@ await client.close();
 
 // osrs_best_owned_setup on the v2 fixture with its bank: Maggot King Far has no melee, ranged comes from the bank
 const fixture = await connect('fixtures/ironman-v2/state.json');
-const far = (await call('osrs_best_owned_setup', { monster: 'Maggot King', monster_version: 'Far', response_format: 'json' }, fixture))
-  .structuredContent as Plan;
+const far = (await call('osrs_best_owned_setup', {
+  monster: 'Maggot King', monster_version: 'Far', boosts: 'live', response_format: 'json',
+}, fixture)).structuredContent as Plan;
 assert.equal(far.monster.version, 'Far');
 assert.ok(far.styles.melee.unavailable, 'melee should be unavailable in the Far phase');
 const ranged = far.styles.ranged.setups![0];
@@ -106,6 +107,46 @@ assert.match(farText, /Rune crossbow \[inventory\]/);
 
 const badStyle = await fixture.callTool({ name: 'osrs_best_owned_setup', arguments: { monster: 'Maggot King', style: 'summoning' } });
 assert.equal(badStyle.isError, true, 'an unknown style should be rejected by the schema');
+
+// Ticket #6, "plan Maggot King Nearby with 2 DWH": Planned boosts by default, the owned potion with its doses,
+// the 3 tiers, the defence before and after, and a higher DPS than with no drain.
+type BoostPlan = {
+  boosts: string;
+  defence: { base: number; effective: number };
+  styles: Record<string, {
+    setups: { dps: number }[];
+    assumed: { prayers: string[]; potions: { name: string; doses: number }[] } | null;
+    tiers: Record<string, { dps: number; swaps: unknown[] } | null>;
+  }>;
+};
+const nearby = { monster: 'Maggot King', monster_version: 'Nearby', unlocked_prayers: ['Piety', 'Rigour', 'Augury'] };
+const noDrain = (await call('osrs_best_owned_setup', { ...nearby, response_format: 'json' }, fixture)).structuredContent as BoostPlan;
+const twoDwh = (await call('osrs_best_owned_setup', { ...nearby, defence_reductions: { dwh_hits: 2 }, response_format: 'json' }, fixture))
+  .structuredContent as BoostPlan;
+assert.equal(twoDwh.boosts, 'planned');
+assert.deepEqual(twoDwh.styles.melee.assumed, { prayers: ['Piety'], potions: [{ name: 'Super combat potion', doses: 6 }] });
+assert.deepEqual(twoDwh.styles.ranged.assumed, { prayers: ['Rigour'], potions: [{ name: 'Ranging potion', doses: 14 }] });
+assert.deepEqual(Object.keys(twoDwh.styles.melee.tiers), ['bestOwned', 'upToTwoSwaps', 'wearingNow']);
+assert.ok(twoDwh.styles.melee.tiers.upToTwoSwaps!.swaps.length <= 2);
+assert.equal(noDrain.defence.effective, noDrain.defence.base);
+assert.ok(twoDwh.defence.effective < twoDwh.defence.base, 'the drains should lower the defence');
+assert.ok(twoDwh.styles.melee.setups[0].dps > noDrain.styles.melee.setups[0].dps, '2 DWH should raise the DPS');
+
+const dwhText = ((await call('osrs_best_owned_setup', { ...nearby, defence_reductions: { dwh_hits: 2 } }, fixture)).content[0] as { text: string }).text;
+assert.match(dwhText, /Boosts: Planned/);
+assert.match(dwhText, new RegExp(`Defence ${twoDwh.defence.base} → \\*\\*${twoDwh.defence.effective}\\*\\* after drains`));
+assert.match(dwhText, /Assumed: Piety · Super combat potion \(6 doses owned\)/);
+assert.match(dwhText, /Best owned: \*\*[\d.]+ DPS\*\*/);
+assert.match(dwhText, /≤ 2 swaps: \*\*[\d.]+ DPS\*\*/);
+assert.match(dwhText, /Wearing now: \*\*[\d.]+ DPS\*\*/);
+
+const liveText = ((await call('osrs_best_owned_setup', { ...nearby, boosts: 'live' }, fixture)).content[0] as { text: string }).text;
+assert.match(liveText, /Boosts: Live/);
+assert.doesNotMatch(liveText, /Assumed:/);
+
+const badUnlocked = await fixture.callTool({ name: 'osrs_best_owned_setup', arguments: { ...nearby, unlocked_prayers: ['Super Piety'] } });
+assert.equal(badUnlocked.isError, true, 'an unknown unlocked prayer should be a readable tool error');
+assert.match((badUnlocked.content[0] as { text: string }).text, /Valid:/);
 await fixture.close();
 
 console.error('Smoke test passed');

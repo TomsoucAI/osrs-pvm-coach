@@ -34,7 +34,7 @@ test('every recommended item is owned and carries its source', async () => {
   const state = await load('ironman-v2');
   const owned = ownedIds(state);
 
-  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' } });
+  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' }, boosts: 'live' });
 
   for (const style of ['melee', 'ranged', 'magic'] as const) {
     const setups = setupsOf(plan.styles[style]);
@@ -48,7 +48,7 @@ test('every recommended item is owned and carries its source', async () => {
 });
 
 test('a style gives its 3 best setups overall, ranked by DPS, each with a different DPS', async () => {
-  const plan = planBankMode(await load('ironman-v2'), { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee' });
+  const plan = planBankMode(await load('ironman-v2'), { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee', boosts: 'live' });
 
   const setups = setupsOf(plan.styles.melee);
   assert.deepEqual(Object.keys(plan.styles), ['melee']);
@@ -71,7 +71,7 @@ function withOnlyWeapon(state: LiveState, name: string): LiveState {
 }
 
 test('Maggot King Far: melee is unavailable, ranged and magic are ranked', async () => {
-  const plan = planBankMode(await load('ironman-v2'), { monster: { name: 'Maggot King', version: 'Far' } });
+  const plan = planBankMode(await load('ironman-v2'), { monster: { name: 'Maggot King', version: 'Far' }, boosts: 'live' });
 
   assert.deepEqual(plan.styles.melee, { unavailable: 'Melee cannot reach the Maggot King in its Far phase.' });
   assert.ok(setupsOf(plan.styles.ranged).length > 0);
@@ -80,7 +80,7 @@ test('Maggot King Far: melee is unavailable, ranged and magic are ranked', async
 
 test('a two-handed weapon leaves the shield slot empty', async () => {
   const state = withOnlyWeapon(await load('ironman-v2'), 'Magic shortbow (i)');
-  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged' });
+  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged', boosts: 'live' });
 
   const setups = setupsOf(plan.styles.ranged);
   assert.ok(setups.length > 0);
@@ -92,7 +92,7 @@ test('a two-handed weapon leaves the shield slot empty', async () => {
 
 test('ammo fits the weapon: bolts with the crossbow, arrows with the bow', async () => {
   const state = await load('ironman-v2');
-  const request = { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged' } as const;
+  const request = { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged', boosts: 'live' } as const;
 
   for (const [weapon, ammo] of [['Rune crossbow', /bolts/], ['Magic shortbow (i)', /arrow/]] as const) {
     const setups = setupsOf(planBankMode(withOnlyWeapon(state, weapon), request).styles.ranged);
@@ -107,10 +107,10 @@ test('ammo fits the weapon: bolts with the crossbow, arrows with the bow', async
 test('magic uses a spell on the current spellbook, and fire against the fire weakness', async () => {
   const state = await load('ironman-v2');
 
-  const standard = planBankMode(state, { monster: { name: 'Maggot King', version: 'Far' }, style: 'magic' });
+  const standard = planBankMode(state, { monster: { name: 'Maggot King', version: 'Far' }, style: 'magic', boosts: 'live' });
   assert.equal(setupsOf(standard.styles.magic)[0].spell, 'Fire Surge');
 
-  const ancient = planBankMode({ ...state, spellbook: 'ancient' }, { monster: { name: 'Maggot King', version: 'Far' }, style: 'magic' });
+  const ancient = planBankMode({ ...state, spellbook: 'ancient' }, { monster: { name: 'Maggot King', version: 'Far' }, style: 'magic', boosts: 'live' });
   for (const setup of setupsOf(ancient.styles.magic)) {
     assert.ok(setup.spell === null || /Barrage|Blitz|Burst|Rush/.test(setup.spell), `${setup.spell} is not an Ancient spell`);
   }
@@ -118,7 +118,7 @@ test('magic uses a spell on the current spellbook, and fire against the fire wea
 
 test('swaps list each slot that differs from what is worn', async () => {
   const state = await load('ironman-v2');
-  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged' });
+  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'ranged', boosts: 'live' });
 
   const best = setupsOf(plan.styles.ranged)[0];
   const weaponSwap = best.swaps.find((s) => s.slot === 'weapon');
@@ -131,7 +131,7 @@ test('swaps list each slot that differs from what is worn', async () => {
 
 test('2 Dragon warhammer hits raise the DPS of each melee weapon', async () => {
   const state = await load('ironman-v2');
-  const request = { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee' } as const;
+  const request = { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee', boosts: 'live' } as const;
 
   for (const weapon of ['Abyssal whip', 'Dragon warhammer']) {
     // The fixture wears the whip: take it off for the other weapon.
@@ -150,17 +150,17 @@ test('notes name the items and spells that the engine data does not know', async
     ...state, equipment: { ...state.equipment, cape: 99999999 }, autocastSpell: 'Spell Of Tomorrow',
   };
 
-  const plan = planBankMode(withUnknown, { monster: { name: 'Maggot King', version: 'Far' }, style: 'magic' });
+  const plan = planBankMode(withUnknown, { monster: { name: 'Maggot King', version: 'Far' }, style: 'magic', boosts: 'live' });
 
   assert.ok(plan.notes.some((n) => /99999999/.test(n) && /cape/.test(n)), plan.notes.join('\n'));
   assert.ok(plan.notes.some((n) => /Spell Of Tomorrow/.test(n)), plan.notes.join('\n'));
-  assert.ok(plan.notes.some((n) => /7 owned items/.test(n)), plan.notes.join('\n'));
+  assert.ok(plan.notes.some((n) => /11 owned items/.test(n)), plan.notes.join('\n'));
 });
 
 test('a v1 state has no bank and no spellbook: the plan says so and still ranks the worn gear', async () => {
   const state = await readState(resolve('../examples/state.sample.json'), resolve('fixtures/none/bank.json'), NOW);
 
-  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' } });
+  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' }, boosts: 'live' });
 
   assert.equal(setupsOf(plan.styles.melee)[0].items.weapon?.name, 'Abyssal whip');
   assert.equal(plan.bankAgeMs, null);
@@ -171,7 +171,7 @@ test('a v1 state has no bank and no spellbook: the plan says so and still ranks 
 test('a logged-out state cannot be planned', async () => {
   const state = await readState(resolve('fixtures/logged-out/state.json'), resolve('fixtures/logged-out/bank.json'), NOW);
 
-  assert.throws(() => planBankMode(state, { monster: { name: 'Maggot King', version: 'Far' } }), /logged out/i);
+  assert.throws(() => planBankMode(state, { monster: { name: 'Maggot King', version: 'Far' }, boosts: 'live' }), /logged out/i);
 });
 
 // Reference setups (Owner verifies, issue #5): Tom enters each one in the official Wiki DPS calculator
@@ -180,6 +180,7 @@ for (const ref of referenceDps.references) {
   const request = {
     monster: { name: 'Maggot King', version: ref.version },
     style: ref.style as CombatStyle,
+    boosts: 'live' as const,
     drains: 'dwhHits' in ref ? { dwhHits: ref.dwhHits } : undefined,
   };
 
@@ -214,7 +215,7 @@ for (const version of ['Far', 'Nearby']) {
       const state = await load('oracle-small');
 
       const expected = exhaustiveSearch(state, { name: 'Maggot King', version }, combat);
-      const actual = setupsOf(planBankMode(state, { monster: { name: 'Maggot King', version }, style: combat }).styles[combat]);
+      const actual = setupsOf(planBankMode(state, { monster: { name: 'Maggot King', version }, style: combat, boosts: 'live' }).styles[combat]);
 
       assert.ok(expected.length > 0, 'the oracle found setups');      assert.deepEqual(
         actual.map((s) => ({ weapon: s.items.weapon?.name ?? null, dps: s.dps, swaps: s.swaps.length })),
@@ -232,10 +233,10 @@ test('the engine alias table is whole again after a plan, and after a plan that 
   const before = JSON.stringify(equipmentAliases);
   assert.ok(Object.keys(equipmentAliases).length > 0);
 
-  planBankMode(state, { monster: { name: 'Maggot King', version: 'Far' }, style: 'ranged' });
+  planBankMode(state, { monster: { name: 'Maggot King', version: 'Far' }, style: 'ranged', boosts: 'live' });
   assert.equal(JSON.stringify(equipmentAliases), before);
 
-  assert.throws(() => planBankMode(state, { monster: { name: 'No Such Monster' } }), /Monster not found/);
+  assert.throws(() => planBankMode(state, { monster: { name: 'No Such Monster' }, boosts: 'live' }), /Monster not found/);
   assert.equal(JSON.stringify(equipmentAliases), before);
 });
 

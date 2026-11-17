@@ -11,7 +11,7 @@ import {
   searchMonsters, VALID,
 } from './calc';
 import { bridgeFile, getSnapshot, Snapshot } from './snapshot';
-import { planBankMode, type Setup } from './core/bankMode';
+import { planBankMode, type AssumedBoosts, type Setup } from './core/bankMode';
 import { readState } from './core/liveState';
 import { dirname, join } from 'node:path';
 import type { Monster } from '@/types/Monster';
@@ -126,14 +126,25 @@ function mdLoadout(l: ReturnType<typeof describeLoadout>) {
   ].join('\n');
 }
 
+const mdSwaps = (s: Setup) => s.swaps.map((w) => `${w.slot}: ${w.from ?? 'empty'} → ${w.to ? `${w.to} [${w.source}]` : 'empty'}`).join('; ');
+
 function mdSetup(s: Setup, rank: number) {
   const gear = Object.entries(s.items).filter(([, item]) => item).map(([slot, item]) => `${slot}: ${item!.name} [${item!.source}]`).join(' · ');
-  const swaps = s.swaps.map((w) => `${w.slot}: ${w.from ?? 'empty'} → ${w.to ? `${w.to} [${w.source}]` : 'empty'}`).join('; ');
   return [
     `${rank}. **${s.dps} DPS** · max hit ${s.maxHit} · accuracy ${s.accuracyPct}% · avg kill ${s.avgTtkSeconds ?? '?'}s · ${s.style}${s.spell ? ` · ${s.spell}` : ''}`,
     `   - **Gear**: ${gear || '(nothing equipped)'}`,
-    `   - **Swaps (${s.swaps.length})**: ${swaps || 'none, this is what you wear now'}`,
+    `   - **Swaps (${s.swaps.length})**: ${mdSwaps(s) || 'none, this is what you wear now'}`,
   ].join('\n');
+}
+
+function mdAssumed(assumed: AssumedBoosts) {
+  const potions = assumed.potions.map((p) => `${p.name} (${p.doses} doses owned)`);
+  return `Assumed: ${assumed.prayers.join(' + ') || 'no prayer'} · ${potions.join(' + ') || 'no owned potion for this style'}`;
+}
+
+function mdTier(label: string, s: Setup | null) {
+  if (!s) return `- ${label}: no setup can attack with this style.`;
+  return `- ${label}: **${s.dps} DPS** · ${s.swaps.length ? `${s.swaps.length} swaps (${mdSwaps(s)})` : 'no swap'}`;
 }
 
 const mdAge = (ms: number) => (ms < 3_600_000 ? `${Math.max(0, Math.round(ms / 60_000))} min` : `${Math.round(ms / 3_600_000)} h`);
@@ -252,18 +263,26 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
 
   server.registerTool('osrs_best_owned_setup', {
     title: 'Best owned OSRS setup',
-    description: `Rank the best setups the player OWNS against one monster version, per combat style (melee, ranged, magic). The owned pool is the worn gear, the inventory and the last bank snapshot from the DPS Bridge plugin. DPS comes from the OSRS Wiki DPS calculator engine with the player's live levels and prayers.
+    description: `Rank the best setups the player OWNS against one monster version, per combat style (melee, ranged, magic). The owned pool is the worn gear, the inventory and the last bank snapshot from the DPS Bridge plugin. DPS comes from the OSRS Wiki DPS calculator engine.
 
-Returns up to 3 setups per style: the 3 best overall. Setups with the same DPS count once (the one with the fewest swaps is shown), so two entries can use the same weapon. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
+Boosts: "planned" (default) assumes, per style, the best unlocked prayer and the best potion found in the inventory and bank, and names that potion with the doses owned. "live" uses the player's levels and prayers as they are now.
+
+Returns up to 3 setups per style: the 3 best overall. Setups with the same DPS count once (the one with the fewest swaps is shown), so two entries can use the same weapon. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. Each style also has 3 tiers with their DPS: best owned, the best within 2 swaps from what is worn, and wearing now. The monster's Defence level is given before and after the drains. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
 
 Examples:
   - "Best setup I own vs Maggot King Far?" -> {monster: "Maggot King", monster_version: "Far"}
   - "Best ranged setup I own for Vorkath?" -> {monster: "Vorkath", monster_version: "Post-quest", style: "ranged"}
-  - "And after 2 DWH specs?" -> {monster: "Maggot King", monster_version: "Nearby", defence_reductions: {dwh_hits: 2}}
+  - "Plan Maggot King Nearby with 2 DWH" -> {monster: "Maggot King", monster_version: "Nearby", defence_reductions: {dwh_hits: 2}}
+  - "My real DPS options right now?" -> {monster: "Maggot King", monster_version: "Nearby", boosts: "live"}
+  - "I don't have Rigour or Augury" -> {..., unlocked_prayers: ["Piety", "Eagle Eye", "Mystic Might"]}
 Use osrs_search_monsters for the exact monster_version. Prefer monster + monster_version to monster_id: the phases of one boss can share an id.`,
     inputSchema: z.strictObject({
       ...monsterFields,
       style: z.enum(['melee', 'ranged', 'magic']).optional().describe('One combat style. Omit to rank all three.'),
+      boosts: z.enum(['planned', 'live']).default('planned')
+        .describe("'planned' (default): the best unlocked prayer and the best owned potion of each style, for planning in the bank. 'live': the levels and prayers as they are now, for the real DPS at the boss."),
+      unlocked_prayers: z.array(z.string()).max(30).optional()
+        .describe(`The prayers that 'planned' can assume, e.g. ["Piety", "Eagle Eye", "Mystic Might"]. Omit when the player has every prayer. Values: ${VALID.prayers.join(', ')}`),
       response_format: responseFormat,
     }),
     annotations: READ_ONLY,
@@ -275,15 +294,30 @@ Use osrs_search_monsters for the exact monster_version. Prefer monster + monster
     else if (state.target) monster = state.target;
     else throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Maggot King") and `monster_version`.');
 
-    const plan = planBankMode(state, { monster, style: a.style, drains: toReductions(a.defence_reductions) });
+    const plan = planBankMode(state, {
+      monster, style: a.style, boosts: a.boosts, unlockedPrayers: a.unlocked_prayers, drains: toReductions(a.defence_reductions),
+    });
     const label = `${plan.monster.name}${plan.monster.version ? ` (${plan.monster.version})` : ''}`;
+    const { base, effective } = plan.defence;
     return reply(a.response_format, { ...plan }, () => [
       `# Best owned setups vs ${label}`,
+      plan.boosts === 'planned'
+        ? 'Boosts: Planned (the best unlocked prayer and the best owned potion of each style).'
+        : 'Boosts: Live (the levels and prayers as they are now).',
+      effective !== base ? `Defence ${base} → **${effective}** after drains.` : `Defence ${base}.`,
       plan.bankAgeMs === null ? 'Bank: no snapshot yet.' : `Bank snapshot: ${mdAge(plan.bankAgeMs)} old.`,
       ...Object.entries(plan.styles).flatMap(([style, stylePlan]) => [
         '',
         `## ${style[0].toUpperCase()}${style.slice(1)}`,
-        'unavailable' in stylePlan ? `Unavailable: ${stylePlan.unavailable}` : stylePlan.setups.map((s, i) => mdSetup(s, i + 1)).join('\n'),
+        'unavailable' in stylePlan ? `Unavailable: ${stylePlan.unavailable}` : [
+          ...(stylePlan.assumed ? [mdAssumed(stylePlan.assumed)] : []),
+          ...stylePlan.setups.map((s, i) => mdSetup(s, i + 1)),
+          '',
+          '**Tiers**',
+          mdTier('Best owned', stylePlan.tiers.bestOwned),
+          mdTier('≤ 2 swaps', stylePlan.tiers.upToTwoSwaps),
+          mdTier('Wearing now', stylePlan.tiers.wearingNow),
+        ].join('\n'),
       ]),
     ].join('\n') + mdNotes(plan.notes));
   });
