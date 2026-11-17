@@ -144,6 +144,64 @@ test('2 Dragon warhammer hits raise the DPS of each melee weapon', async () => {
   }
 });
 
+// The plugin counted 2 Dragon warhammer hits on the Maggot King. 3.5 is the Wiki DPS calculator's
+// value for the reference setup "Nearby melee, 2 Dragon warhammer hits" (reference-dps.json).
+async function withCountedDwhHits(): Promise<LiveState> {
+  const state = await load('ironman-v2');
+  const { id } = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee', boosts: 'live' }).monster;
+  return {
+    ...state,
+    target: { id, name: 'Maggot King' },
+    drains: {
+      targetId: id, dwhHits: 2, elderMaulHits: 0, bgsDamage: 0,
+    },
+  };
+}
+
+test('counted drains are used by default', async () => {
+  const state = await withCountedDwhHits();
+
+  const plan = planBankMode(state, { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee', boosts: 'live' });
+
+  assert.equal(setupsOf(plan.styles.melee)[0].dps, 3.5);
+  assert.ok(plan.notes.some((n) => /counted/i.test(n) && /2 Dragon warhammer/.test(n)), plan.notes.join('\n'));
+});
+
+test('manual drains replace the counted drains', async () => {
+  const state = await withCountedDwhHits();
+  const request = { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee', boosts: 'live' } as const;
+  const noDrains = setupsOf(planBankMode({ ...state, drains: null }, request).styles.melee)[0].dps;
+
+  const missed = planBankMode(state, { ...request, drains: { dwhHits: 0 } });
+  const oneHit = planBankMode(state, { ...request, drains: { dwhHits: 1 } });
+
+  assert.equal(setupsOf(missed.styles.melee)[0].dps, noDrains);
+  assert.ok(setupsOf(oneHit.styles.melee)[0].dps > noDrains);
+  assert.ok(setupsOf(oneHit.styles.melee)[0].dps < 3.5);
+  assert.ok(!missed.notes.some((n) => /counted/i.test(n)), missed.notes.join('\n'));
+});
+
+test('counted drains do not apply to another monster', async () => {
+  const state = await withCountedDwhHits();
+  const request = { monster: { name: 'Abyssal demon' }, style: 'melee', boosts: 'live' } as const;
+
+  const plan = planBankMode(state, request);
+
+  assert.equal(setupsOf(plan.styles.melee)[0].dps, setupsOf(planBankMode({ ...state, drains: null }, request).styles.melee)[0].dps);
+  assert.ok(!plan.notes.some((n) => /counted/i.test(n)), plan.notes.join('\n'));
+});
+
+test('counted drains apply when the engine data does not know the NPC id but the target name matches', async () => {
+  const state = await withCountedDwhHits();
+  const unknownId: LiveState = {
+    ...state, target: { id: 99999999, name: 'Maggot King' }, drains: { ...state.drains!, targetId: 99999999 },
+  };
+
+  const plan = planBankMode(unknownId, { monster: { name: 'Maggot King', version: 'Nearby' }, style: 'melee', boosts: 'live' });
+
+  assert.equal(setupsOf(plan.styles.melee)[0].dps, 3.5);
+});
+
 test('notes name the items and spells that the engine data does not know', async () => {
   const state = await load('ironman-v2');
   const withUnknown: LiveState = {

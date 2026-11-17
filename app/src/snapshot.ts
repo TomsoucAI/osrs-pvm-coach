@@ -5,8 +5,18 @@ import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import WebSocket from 'ws';
+import * as z from 'zod/v4';
 
 export type SkillMap = Partial<Record<'atk' | 'str' | 'def' | 'ranged' | 'magic' | 'prayer' | 'hp' | 'mining' | 'herblore' | 'farming', number>>;
+
+/** The player's own landed spec drains that the plugin counted on one NPC. */
+export const countedDrainsSchema = z.object({
+  targetId: z.number().int(),
+  dwhHits: z.number().int(),
+  elderMaulHits: z.number().int(),
+  bgsDamage: z.number().int(),
+});
+export type CountedDrains = z.infer<typeof countedDrainsSchema>;
 
 export interface Snapshot {
   source: 'dps-bridge' | 'wikisync' | 'manual';
@@ -22,6 +32,7 @@ export interface Snapshot {
   autocastSpell?: string;
   buffs?: { onSlayerTask?: boolean; inWilderness?: boolean; kandarinDiary?: boolean; chargeSpell?: boolean };
   target?: { id: number; name: string } | null;
+  drains?: CountedDrains | null;
 }
 
 export const bridgeFile = () => process.env.DPS_BRIDGE_FILE
@@ -32,7 +43,8 @@ async function readBridge(): Promise<Snapshot | null> {
     await stat(bridgeFile());
     const data = JSON.parse(await readFile(bridgeFile(), 'utf8'));
     if (data.loggedIn === false) return null;
-    return { ...data, source: 'dps-bridge' };
+    // Drains that do not match the schema count as no drains.
+    return { ...data, drains: countedDrainsSchema.nullable().catch(null).parse(data.drains ?? null), source: 'dps-bridge' };
   } catch {
     return null;
   }

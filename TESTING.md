@@ -44,6 +44,10 @@ Do each action in game and confirm the printout changes:
 | Change spellbook | `Spellbook` = standard / ancient / lunar / arceuus |
 | Open the bank, then withdraw an item | `Bank` shows the stack count, `seen 0 s ago` |
 | Close the bank, restart the client, log in | `Bank` is still there, with its age |
+| Land a DWH, Elder maul or BGS spec on a monster | `Drains` shows one more hit (BGS: the damage), DPS goes up |
+| Miss a spec | `Drains` does not change |
+| Attack another monster | `Drains` goes back to 0 |
+| Kill the target | `Drains` = `(no counted target)` |
 | Log out | `✗ No live RuneLite data` (or WikiSync fallback) |
 
 Raw file if you want to look: `~/.runelite/plugin-data/dps_bridge/state.json`
