@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "paths": { "@/*": ["./../../vendor/osrs-dps-calc/src/*"] }
+  },
+  "include": ["src/**/*"]
+}

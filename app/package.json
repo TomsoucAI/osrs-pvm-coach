@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node build.mjs && node dist/selftest.js && node --test dist/core.test.js && tsx scripts/smoke.ts",
+    "test": "node build.mjs && node dist/selftest.js && node --test dist/core.test.js dist/ui.test.js && tsx scripts/smoke.ts",
     "start": "node dist/index.js",
+    "ui": "node dist/ui.js",
     "setup": "node setup.mjs",
     "update-calc": "node setup.mjs --latest && tsx scripts/gen-engine-named-items.ts && node build.mjs",
     "gen-named-items": "tsx scripts/gen-engine-named-items.ts",
@@ -32,10 +33,15 @@
     "@modelcontextprotocol/client": "^2.4.0",
     "@types/lodash.mergewith": "^4.6.9",
     "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.3.0",
     "esbuild": "^0.28.2",
+    "react-dom": "^19.3.1",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
   },
   "type": "module",
   "bin": {
