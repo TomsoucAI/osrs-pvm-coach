@@ -4748,7 +4748,8 @@ var require_Sapphire_Glacialis = __commonJS({
 });
 
 // src/ui.ts
-import { dirname as dirname2, join as join3, resolve } from "node:path";
+import { homedir as homedir2 } from "node:os";
+import { dirname as dirname2, join as join4, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
@@ -11111,9 +11112,9 @@ var bridgeFile = () => process.env.DPS_BRIDGE_FILE ?? join(homedir(), ".runelite
 
 // src/ui/server.ts
 import { watch } from "node:fs";
-import { readdir, readFile as readFile2 } from "node:fs/promises";
+import { readdir, readFile as readFile3 } from "node:fs/promises";
 import { createServer } from "node:http";
-import { basename, dirname, extname, join as join2, relative, sep } from "node:path";
+import { basename, dirname, extname, join as join3, relative, sep } from "node:path";
 
 // src/calc.ts
 var import_lodash2 = __toESM(require_lodash(), 1);
@@ -315479,6 +315480,54 @@ ${prettifyError(parsed.error)}`);
   return { source: "dps-bridge", ...fields, bank };
 }
 
+// src/ui/icons.ts
+import { mkdir, readFile as readFile2, rename, writeFile } from "node:fs/promises";
+import { join as join2 } from "node:path";
+var WIKI_IMAGES = "https://oldschool.runescape.wiki/images/";
+var USER_AGENT = "osrs-pvm-coach (local item icon cache)";
+var FETCH_TIMEOUT_MS = 5e3;
+var MAX_ICON_BYTES = 64 * 1024;
+var PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+function createIconCache(dir, fetchIcon) {
+  const failed = /* @__PURE__ */ new Set();
+  const pending = /* @__PURE__ */ new Map();
+  async function download(id, image) {
+    const url = WIKI_IMAGES + encodeURIComponent(image.replaceAll(" ", "_"));
+    try {
+      const reply = await fetchIcon(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      if (!reply.ok || !reply.headers.get("content-type")?.startsWith("image/png")) return null;
+      const body = Buffer.from(await reply.arrayBuffer());
+      if (body.length > MAX_ICON_BYTES || !body.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return null;
+      await mkdir(dir, { recursive: true });
+      const file = join2(dir, `${id}.png`);
+      await writeFile(`${file}.tmp`, body);
+      await rename(`${file}.tmp`, file);
+      return body;
+    } catch {
+      return null;
+    }
+  }
+  return {
+    async get(itemId) {
+      const item = findItem(itemId);
+      if (!item?.image) return null;
+      const cached2 = await readFile2(join2(dir, `${item.id}.png`)).catch(() => null);
+      if (cached2) return cached2;
+      if (failed.has(item.id)) return null;
+      let job = pending.get(item.id);
+      if (!job) {
+        job = download(item.id, item.image).then((icon) => {
+          if (!icon) failed.add(item.id);
+          pending.delete(item.id);
+          return icon;
+        });
+        pending.set(item.id, job);
+      }
+      return job;
+    }
+  };
+}
+
 // src/ui/server.ts
 var COMBAT_STYLES2 = ["melee", "ranged", "magic"];
 var CONTENT_TYPES = {
@@ -315522,9 +315571,11 @@ function summarize(state, monsterQuery) {
       playerName: null,
       bankAgeMs: state.bank?.ageMs ?? null,
       worn: null,
+      wornIds: null,
       now: null
     };
   }
+  const wornIds = Object.fromEntries(SLOTS.map((slot) => [slot, state.equipment?.[slot] ?? null]));
   const worn = Object.fromEntries(SLOTS.map((slot) => {
     const id = state.equipment?.[slot];
     return [slot, id === null || id === void 0 ? null : findItem(id)?.name ?? `Item ${id}`];
@@ -315556,6 +315607,7 @@ function summarize(state, monsterQuery) {
     playerName: state.playerName ?? null,
     bankAgeMs: state.bank?.ageMs ?? null,
     worn,
+    wornIds,
     now
   };
 }
@@ -315564,7 +315616,7 @@ async function listPage(pageDir) {
   const files = /* @__PURE__ */ new Map();
   for (const entry of entries) {
     if (!entry.isFile()) continue;
-    const file = join2(entry.parentPath, entry.name);
+    const file = join3(entry.parentPath, entry.name);
     files.set(`/${relative(pageDir, file).split(sep).join("/")}`, file);
   }
   const index = files.get("/index.html");
@@ -315575,6 +315627,7 @@ async function listPage(pageDir) {
 async function startUiServer(options) {
   const streams = /* @__PURE__ */ new Set();
   const pageFiles = await listPage(options.pageDir);
+  const icons = createIconCache(options.iconCacheDir, options.fetchIcon ?? fetch);
   let ownOrigins = /* @__PURE__ */ new Set();
   const isOwnPage = (req) => {
     const own2 = `http://${req.headers.host}`;
@@ -315615,6 +315668,14 @@ async function startUiServer(options) {
         const hits = q.length < 2 ? [] : searchMonsters(q).slice(0, 50).map(({ name, version: version2 }) => ({ name, version: version2 }));
         return sendJson(res, 200, hits);
       }
+      case "/api/icon": {
+        const id = query.get("id") ?? "";
+        if (!/^\d{1,9}$/.test(id)) throw new HttpError(400, 'The "id" parameter is an item id.');
+        const icon = await icons.get(Number(id));
+        if (!icon) throw new HttpError(404, "No icon for this item.");
+        res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "max-age=86400" });
+        return res.end(icon);
+      }
       case "/api/events":
         res.writeHead(200, { "Content-Type": "text/event-stream" });
         if (req.method === "HEAD") return res.end();
@@ -315625,7 +315686,7 @@ async function startUiServer(options) {
       default: {
         const file = pageFiles.get(url.pathname);
         if (!file) throw new HttpError(404, "Not found.");
-        const body = await readFile2(file);
+        const body = await readFile3(file);
         res.writeHead(200, { "Content-Type": CONTENT_TYPES[extname(file)] ?? "application/octet-stream" });
         return res.end(body);
       }
@@ -315708,8 +315769,9 @@ try {
   const server = await startUiServer({
     port,
     stateFile,
-    bankFile: join3(dirname2(stateFile), "bank.json"),
-    pageDir: join3(dirname2(fileURLToPath(import.meta.url)), "page")
+    bankFile: join4(dirname2(stateFile), "bank.json"),
+    pageDir: join4(dirname2(fileURLToPath(import.meta.url)), "page"),
+    iconCacheDir: join4(homedir2(), ".osrs-pvm-coach", "icons")
   });
   console.log(`Bank mode: http://127.0.0.1:${server.port}/  (${values.fixture ? "fixture" : "live"}: ${dirname2(stateFile)})`);
   console.log("Stop with Ctrl+C.");
