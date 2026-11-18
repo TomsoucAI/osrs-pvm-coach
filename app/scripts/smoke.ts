@@ -151,7 +151,22 @@ assert.doesNotMatch(liveText, /Assumed:/);
 const badUnlocked = await fixture.callTool({ name: 'osrs_best_owned_setup', arguments: { ...nearby, unlocked_prayers: ['SUPER_PIETY'] } });
 assert.equal(badUnlocked.isError, true, 'an unknown unlocked prayer should be rejected by the schema');
 assert.match((badUnlocked.content[0] as { text: string }).text, /Input validation error/);
+
+// Ticket #7: the standard-spellbook fixture has no thrall line
+assert.equal((twoDwh as BoostPlan & { thrall: unknown }).thrall, null);
+assert.doesNotMatch(dwhText, /thrall/i);
 await fixture.close();
+
+// Ticket #7: the Arceuus fixture has a "+ greater thrall" line next to the Wiki-calc DPS, with its wiki source
+const arceuus = await connect('fixtures/ironman-arceuus/state.json');
+const farArgs = { monster: 'Maggot King', monster_version: 'Far', style: 'ranged', boosts: 'live' };
+const withThrall = (await call('osrs_best_owned_setup', { ...farArgs, response_format: 'json' }, arceuus)).structuredContent as Plan
+  & { thrall: { dps: number; source: { url: string; readOn: string } } | null };
+assert.equal(withThrall.thrall?.dps, 0.625);
+assert.equal(withThrall.styles.ranged.setups![0].dps, 4.344, 'the thrall is not in the Wiki-calc DPS');
+const thrallText = ((await call('osrs_best_owned_setup', farArgs, arceuus)).content[0] as { text: string }).text;
+assert.match(thrallText, /\+ Greater thrall: \*\*0\.625 DPS\*\*, on top of each setup's DPS \(not in it\)\. Source: https:\/\/oldschool\.runescape\.wiki\/w\/Thralls, read on 2026-11-18\./);
+await arceuus.close();
 
 // Counted drains (state v2): the plugin counted 1 DWH hit on the current target, an Abyssal demon (defence 135 - floor(135 * 0.3) = 95)
 type Dps = { defence_level: { base: number; effective: number }; result: { dps: number }; notes: string[] };

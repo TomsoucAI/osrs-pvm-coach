@@ -12298,6 +12298,16 @@ var Prayer = /* @__PURE__ */ ((Prayer2) => {
   Prayer2[Prayer2["ZEAL"] = 21] = "ZEAL";
   return Prayer2;
 })(Prayer || {});
+var BRAIN_PRAYERS = [
+  1 /* CLARITY_OF_THOUGHT */,
+  5 /* IMPROVED_REFLEXES */,
+  9 /* INCREDIBLE_REFLEXES */
+];
+var ARM_PRAYERS = [
+  0 /* BURST_OF_STRENGTH */,
+  4 /* SUPERHUMAN_STRENGTH */,
+  8 /* ULTIMATE_STRENGTH */
+];
 var PrayerMap = {
   [0 /* BURST_OF_STRENGTH */]: {
     renderOrder: 1,
@@ -314671,6 +314681,9 @@ function resolveMonsterWithDrains(spec, snap, manual) {
     drainNotes: counted ? [countedDrainsNote(counted)] : []
   };
 }
+function defenceAfterReductions(monster) {
+  return { base: monster.skills.def, effective: scaleMonster(monster).skills.def };
+}
 function itemFromNameOrId(v) {
   if (typeof v === "number" || /^\d+$/.test(v)) {
     const item2 = findItem(Number(v));
@@ -315049,9 +315062,106 @@ function phaseUnavailable(monster, style) {
   return rule?.reason ?? null;
 }
 
+// src/core/plannedBoosts.ts
+var ALL_PRAYERS = Object.values(Prayer).filter((p) => typeof p === "number");
+function parseUnlocked(names) {
+  return names.map((name) => {
+    const key = name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+    const prayer = ALL_PRAYERS.find((p) => Prayer[p] === key);
+    if (prayer === void 0) {
+      throw new Error(`Unknown unlocked prayer "${name}". Valid: ${ALL_PRAYERS.map((p) => PrayerMap[p].name).join(", ")}`);
+    }
+    return prayer;
+  });
+}
+function gain(prayer) {
+  const { factorAccuracy, factorStrength, magicDamageBonus } = PrayerMap[prayer];
+  return (factorAccuracy?.[0] ?? 100) - 100 + ((factorStrength?.[0] ?? 100) - 100) + (magicDamageBonus ?? 0);
+}
+function bestPrayers(combat, unlocked) {
+  const allowed = (unlocked ? parseUnlocked(unlocked) : ALL_PRAYERS).filter((p) => PrayerMap[p].combatStyle === combat);
+  const accuracyOnly = allowed.filter((p) => BRAIN_PRAYERS.includes(p));
+  const strengthOnly = allowed.filter((p) => ARM_PRAYERS.includes(p));
+  const sets = [
+    ...allowed.map((p) => [p]),
+    ...accuracyOnly.flatMap((a) => strengthOnly.map((s) => [a, s]))
+  ];
+  const total = (set) => set.reduce((sum2, p) => sum2 + gain(p), 0);
+  return sets.reduce((best, set) => total(set) > total(best) ? set : best, []);
+}
+var POTION_ITEMS = [
+  { name: "Attack potion", engine: [Potion_default.ATTACK], ids: [2428, 121, 123, 125] },
+  { name: "Strength potion", engine: [Potion_default.STRENGTH], ids: [113, 115, 117, 119] },
+  { name: "Combat potion", engine: [Potion_default.ATTACK, Potion_default.STRENGTH], ids: [9739, 9741, 9743, 9745] },
+  { name: "Super attack", engine: [Potion_default.SUPER_ATTACK], ids: [2436, 145, 147, 149] },
+  { name: "Super strength", engine: [Potion_default.SUPER_STRENGTH], ids: [2440, 157, 159, 161] },
+  { name: "Super combat potion", engine: [Potion_default.SUPER_COMBAT], ids: [12695, 12697, 12699, 12701] },
+  { name: "Divine super attack potion", engine: [Potion_default.SUPER_ATTACK], ids: [23697, 23700, 23703, 23706] },
+  { name: "Divine super strength potion", engine: [Potion_default.SUPER_STRENGTH], ids: [23709, 23712, 23715, 23718] },
+  { name: "Divine super combat potion", engine: [Potion_default.SUPER_COMBAT], ids: [23685, 23688, 23691, 23694] },
+  { name: "Ranging potion", engine: [Potion_default.RANGING], ids: [2444, 169, 171, 173] },
+  { name: "Bastion potion", engine: [Potion_default.RANGING], ids: [22461, 22464, 22467, 22470] },
+  { name: "Divine ranging potion", engine: [Potion_default.RANGING], ids: [23733, 23736, 23739, 23742] },
+  { name: "Divine bastion potion", engine: [Potion_default.RANGING], ids: [24635, 24638, 24641, 24644] },
+  { name: "Magic potion", engine: [Potion_default.MAGIC], ids: [3040, 3042, 3044, 3046] },
+  { name: "Battlemage potion", engine: [Potion_default.MAGIC], ids: [22449, 22452, 22455, 22458] },
+  { name: "Divine magic potion", engine: [Potion_default.MAGIC], ids: [23745, 23748, 23751, 23754] },
+  { name: "Divine battlemage potion", engine: [Potion_default.MAGIC], ids: [24623, 24626, 24629, 24632] },
+  { name: "Ancient brew", engine: [Potion_default.ANCIENT], ids: [26340, 26342, 26344, 26346] },
+  { name: "Forgotten brew", engine: [Potion_default.FORGOTTEN_BREW], ids: [27629, 27632, 27635, 27638] }
+];
+var STYLE_SKILLS = { melee: ["atk", "str"], ranged: ["ranged"], magic: ["magic"] };
+function bestOwnedPotions(combat, skills, owned) {
+  const dosesOf = (ids) => owned.reduce((sum2, { id, quantity }) => {
+    const index = ids.indexOf(id);
+    return index < 0 || quantity <= 0 ? sum2 : sum2 + quantity * (4 - index);
+  }, 0);
+  const potions = POTION_ITEMS.map(({ name, engine, ids }) => ({ name, engine, doses: dosesOf(ids) })).filter((p) => p.doses > 0);
+  const boost = (p, skill) => Math.max(0, ...p.engine.map((e) => PotionMap[e].calculateFn(skills)[skill] ?? 0));
+  const wanted = STYLE_SKILLS[combat];
+  const top = (skill) => Math.max(0, ...potions.map((p) => boost(p, skill)));
+  const useful = potions.filter((p) => wanted.some((skill) => boost(p, skill) > 0)).sort((a, b) => b.doses - a.doses);
+  const complete = useful.find((p) => wanted.every((skill) => boost(p, skill) === top(skill)));
+  if (complete) return [complete];
+  const perSkill = wanted.flatMap((skill) => useful.find((p) => boost(p, skill) === top(skill)) ?? []);
+  return [...new Set(perSkill)];
+}
+
+// src/core/thrall.ts
+var GREATER_THRALL_MAGIC_LEVEL = 76;
+var GREATER_THRALL_RUNES = [
+  { id: 554, quantity: 10 },
+  // FIRE_RUNE
+  { id: 565, quantity: 5 },
+  // BLOOD_RUNE
+  { id: 564, quantity: 1 }
+  // COSMIC_RUNE
+];
+var GREATER_THRALL = {
+  name: "Greater thrall",
+  dps: 0.625,
+  maxHit: 3,
+  attackSeconds: 2.4,
+  source: { url: "https://oldschool.runescape.wiki/w/Thralls", readOn: "2026-11-18" }
+};
+function thrallLine(state) {
+  if (state.spellbook !== "arceuus") return null;
+  const magic = state.boostedLevels?.magic ?? state.realLevels?.magic ?? 0;
+  if (magic < GREATER_THRALL_MAGIC_LEVEL) return null;
+  const owned = [
+    ...state.runePouch.map(({ runeItemId, quantity }) => ({ id: runeItemId, quantity })),
+    ...state.inventory,
+    ...state.bank?.items ?? []
+  ];
+  const count = (id) => owned.reduce((sum2, s) => s.id === id && s.quantity > 0 ? sum2 + s.quantity : sum2, 0);
+  if (GREATER_THRALL_RUNES.some(({ id, quantity }) => count(id) < quantity)) return null;
+  return GREATER_THRALL;
+}
+
 // src/core/bankMode.ts
 var COMBAT_STYLES = ["melee", "ranged", "magic"];
 var SETUPS_PER_STYLE = 3;
+var TIER_SWAPS = 2;
 var OTHER_SLOTS = SLOTS.filter((s) => s !== "weapon");
 var ENGINE_NAMED = new Set(engineNamedItems_default);
 var BLOCKING_ISSUES = /* @__PURE__ */ new Set([
@@ -315277,7 +315387,7 @@ var TopSetups = class {
     return [...this.byDps.values()].sort((a, b) => b.dps - a.dps);
   }
 };
-function searchAttack(template, attack, pool, worn, monster, top) {
+function searchAttack(template, attack, pool, worn, monster, top, maxSwaps) {
   const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
   if (slots.some((items) => items.plain.length === 0)) return;
   const effective = effectiveNamed(template, attack, slots, monster);
@@ -315296,6 +315406,8 @@ function searchAttack(template, attack, pool, worn, monster, top) {
     return searchDps(template, attack, bounded, monster);
   };
   const chooseOnStats = (open2, from) => {
+    const notChosen = new Set(open2.slice(from).map((i) => OTHER_SLOTS[i]));
+    if (SLOTS.filter((s) => !notChosen.has(s) && gear[s] !== worn[s]).length > maxSwaps) return;
     const dps = bound(open2, from);
     if (dps <= 0 || round3(dps) < top.floor()) return;
     if (from === open2.length) {
@@ -315325,9 +315437,9 @@ function searchAttack(template, attack, pool, worn, monster, top) {
   };
   chooseExact(0, []);
 }
-function rankStyle(template, combat, pool, worn, spellbook, monster) {
+function rankStyle(template, combat, pool, worn, spellbook, monster, maxSwaps = Infinity) {
   const top = new TopSetups();
-  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top);
+  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top, maxSwaps);
   return top.ranked();
 }
 function describe2(template, c, worn, monster) {
@@ -315362,7 +315474,7 @@ function planBankMode(state, request) {
     notEquipment
   } = collectOwned(state);
   const empty2 = Object.fromEntries(SLOTS.map((s) => [s, null]));
-  const template = buildPlayer(state, monster, { equipment: empty2 }).player;
+  const live = buildPlayer(state, monster, { equipment: empty2 }).player;
   const wanted = request.style ? [request.style] : COMBAT_STYLES;
   const styles = {};
   for (const combat of wanted) {
@@ -315371,8 +315483,38 @@ function planBankMode(state, request) {
       styles[combat] = { unavailable };
       continue;
     }
-    const ranked = withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster));
-    styles[combat] = ranked.length ? { setups: ranked.map((c) => describe2(template, c, worn, monster)).sort((a, b) => b.dps - a.dps) } : { unavailable: `No owned setup can attack with ${combat}.` };
+    let template = live;
+    let assumed = null;
+    if (request.boosts === "planned") {
+      const prayers = bestPrayers(combat, request.unlockedPrayers);
+      const potions = bestOwnedPotions(combat, live.skills, [...state.inventory, ...state.bank?.items ?? []]);
+      template = buildPlayer(state, monster, {
+        equipment: empty2,
+        prayers: prayers.map((p) => Prayer[p]),
+        potions: potions.flatMap((p) => p.engine.map((e) => Potion_default[e]))
+      }).player;
+      assumed = {
+        prayers: prayers.map((p) => PrayerMap[p].name),
+        potions: potions.map(({ name, doses }) => ({ name, doses }))
+      };
+    }
+    const rank = (maxSwaps) => withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster, maxSwaps));
+    const ranked = rank();
+    if (!ranked.length) {
+      styles[combat] = { unavailable: `No owned setup can attack with ${combat}.` };
+      continue;
+    }
+    const setups = ranked.map((c) => describe2(template, c, worn, monster)).sort((a, b) => b.dps - a.dps);
+    const within = (maxSwaps) => {
+      if (setups[0].swaps.length <= maxSwaps) return setups[0];
+      const [best] = rank(maxSwaps);
+      return best ? describe2(template, best, worn, monster) : null;
+    };
+    styles[combat] = {
+      setups,
+      assumed,
+      tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS), wearingNow: within(0) }
+    };
   }
   const notes = [...unknownWorn, ...drainNotes];
   if (notEquipment) {
@@ -315389,7 +315531,10 @@ function planBankMode(state, request) {
   }
   return {
     monster: { id: monster.id, name: monster.name, version: monster.version ?? "" },
+    defence: defenceAfterReductions(monster),
+    boosts: request.boosts,
     styles,
+    thrall: thrallLine(state),
     bankAgeMs: state.bank?.ageMs ?? null,
     notes
   };

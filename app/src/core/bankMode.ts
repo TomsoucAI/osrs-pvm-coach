@@ -38,6 +38,7 @@ import engineNamedItems from './engineNamedItems.json';
 import type { ItemStack, LiveState } from './liveState';
 import { phaseUnavailable, type CombatStyle } from './phaseRules';
 import { bestOwnedPotions, bestPrayers } from './plannedBoosts';
+import { thrallLine, type ThrallLine } from './thrall';
 
 export type Slot = keyof PlayerEquipment;
 export type ItemSource = 'worn' | 'inventory' | 'bank';
@@ -96,6 +97,8 @@ export interface BankModePlan {
   defence: { base: number; effective: number };
   boosts: BoostMode;
   styles: Partial<Record<CombatStyle, StylePlan>>;
+  /** A greater thrall's DPS, to add on top of a setup's DPS. It is in no setup's DPS. null = the player cannot cast one. */
+  thrall: ThrallLine | null;
   /** Age of the bank snapshot, or null when there is none. */
   bankAgeMs: number | null;
   notes: string[];
@@ -542,6 +545,7 @@ export function planBankMode(state: LiveState, request: BankModeRequest): BankMo
     defence: defenceAfterReductions(monster),
     boosts: request.boosts,
     styles,
+    thrall: thrallLine(state),
     bankAgeMs: state.bank?.ageMs ?? null,
     notes,
   };
