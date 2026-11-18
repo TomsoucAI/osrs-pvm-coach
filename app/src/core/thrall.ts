@@ -12,7 +12,7 @@ export interface ThrallLine {
 
 // OSRS Wiki, Thralls page: greater thralls (ghost, skeleton, zombie) "always deal successful hits" of 0 to 3,
 // once every 2.4 seconds (4 ticks). The page gives their DPS as 0.625. Casting needs Magic 76 and
-// 10 fire, 5 blood and 1 cosmic runes. Item ids: RuneLite `net.runelite.api.ItemID`.
+// 10 fire, 5 blood and 1 cosmic runes. Item ids: RuneLite `net.runelite.api.ItemID` (runelite-api 1.13.6), read on 2026-11-18.
 const GREATER_THRALL_MAGIC_LEVEL = 76;
 const GREATER_THRALL_RUNES = [
   { id: 554, quantity: 10 }, // FIRE_RUNE
