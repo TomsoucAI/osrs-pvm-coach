@@ -43,6 +43,8 @@ jobs:
       - run: npm run setup
       # Builds the app, then runs the selftest and the smoke test.
       - run: npm test
+      # dist/ is committed and users run it as is. `npm test` rebuilt it: any difference means the PR forgot a rebuild.
+      - run: git diff --exit-code -- dist
 
   plugin:
     runs-on: ubuntu-latest
