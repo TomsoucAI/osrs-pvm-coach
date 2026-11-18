@@ -28203,6 +28203,16 @@ var Prayer = /* @__PURE__ */ ((Prayer2) => {
   Prayer2[Prayer2["ZEAL"] = 21] = "ZEAL";
   return Prayer2;
 })(Prayer || {});
+var BRAIN_PRAYERS = [
+  1 /* CLARITY_OF_THOUGHT */,
+  5 /* IMPROVED_REFLEXES */,
+  9 /* INCREDIBLE_REFLEXES */
+];
+var ARM_PRAYERS = [
+  0 /* BURST_OF_STRENGTH */,
+  4 /* SUPERHUMAN_STRENGTH */,
+  8 /* ULTIMATE_STRENGTH */
+];
 var PrayerMap = {
   [0 /* BURST_OF_STRENGTH */]: {
     renderOrder: 1,
@@ -331058,9 +331068,75 @@ function phaseUnavailable(monster, style) {
   return rule?.reason ?? null;
 }
 
+// src/core/plannedBoosts.ts
+var ALL_PRAYERS = Object.values(Prayer).filter((p) => typeof p === "number");
+function parseUnlocked(names) {
+  return names.map((name) => {
+    const key = name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+    const prayer = ALL_PRAYERS.find((p) => Prayer[p] === key);
+    if (prayer === void 0) {
+      throw new Error(`Unknown unlocked prayer "${name}". Valid: ${ALL_PRAYERS.map((p) => PrayerMap[p].name).join(", ")}`);
+    }
+    return prayer;
+  });
+}
+function gain(prayer) {
+  const { factorAccuracy, factorStrength, magicDamageBonus } = PrayerMap[prayer];
+  return (factorAccuracy?.[0] ?? 100) - 100 + ((factorStrength?.[0] ?? 100) - 100) + (magicDamageBonus ?? 0);
+}
+function bestPrayers(combat, unlocked) {
+  const allowed = (unlocked ? parseUnlocked(unlocked) : ALL_PRAYERS).filter((p) => PrayerMap[p].combatStyle === combat);
+  const accuracyOnly = allowed.filter((p) => BRAIN_PRAYERS.includes(p));
+  const strengthOnly = allowed.filter((p) => ARM_PRAYERS.includes(p));
+  const sets = [
+    ...allowed.map((p) => [p]),
+    ...accuracyOnly.flatMap((a) => strengthOnly.map((s) => [a, s]))
+  ];
+  const total = (set) => set.reduce((sum2, p) => sum2 + gain(p), 0);
+  return sets.reduce((best, set) => total(set) > total(best) ? set : best, []);
+}
+var POTION_ITEMS = [
+  { name: "Attack potion", engine: [Potion_default.ATTACK], ids: [2428, 121, 123, 125] },
+  { name: "Strength potion", engine: [Potion_default.STRENGTH], ids: [113, 115, 117, 119] },
+  { name: "Combat potion", engine: [Potion_default.ATTACK, Potion_default.STRENGTH], ids: [9739, 9741, 9743, 9745] },
+  { name: "Super attack", engine: [Potion_default.SUPER_ATTACK], ids: [2436, 145, 147, 149] },
+  { name: "Super strength", engine: [Potion_default.SUPER_STRENGTH], ids: [2440, 157, 159, 161] },
+  { name: "Super combat potion", engine: [Potion_default.SUPER_COMBAT], ids: [12695, 12697, 12699, 12701] },
+  { name: "Divine super attack potion", engine: [Potion_default.SUPER_ATTACK], ids: [23697, 23700, 23703, 23706] },
+  { name: "Divine super strength potion", engine: [Potion_default.SUPER_STRENGTH], ids: [23709, 23712, 23715, 23718] },
+  { name: "Divine super combat potion", engine: [Potion_default.SUPER_COMBAT], ids: [23685, 23688, 23691, 23694] },
+  { name: "Ranging potion", engine: [Potion_default.RANGING], ids: [2444, 169, 171, 173] },
+  { name: "Bastion potion", engine: [Potion_default.RANGING], ids: [22461, 22464, 22467, 22470] },
+  { name: "Divine ranging potion", engine: [Potion_default.RANGING], ids: [23733, 23736, 23739, 23742] },
+  { name: "Divine bastion potion", engine: [Potion_default.RANGING], ids: [24635, 24638, 24641, 24644] },
+  { name: "Magic potion", engine: [Potion_default.MAGIC], ids: [3040, 3042, 3044, 3046] },
+  { name: "Battlemage potion", engine: [Potion_default.MAGIC], ids: [22449, 22452, 22455, 22458] },
+  { name: "Divine magic potion", engine: [Potion_default.MAGIC], ids: [23745, 23748, 23751, 23754] },
+  { name: "Divine battlemage potion", engine: [Potion_default.MAGIC], ids: [24623, 24626, 24629, 24632] },
+  { name: "Ancient brew", engine: [Potion_default.ANCIENT], ids: [26340, 26342, 26344, 26346] },
+  { name: "Forgotten brew", engine: [Potion_default.FORGOTTEN_BREW], ids: [27629, 27632, 27635, 27638] }
+];
+var STYLE_SKILLS = { melee: ["atk", "str"], ranged: ["ranged"], magic: ["magic"] };
+function bestOwnedPotions(combat, skills, owned) {
+  const dosesOf = (ids) => owned.reduce((sum2, { id, quantity }) => {
+    const index = ids.indexOf(id);
+    return index < 0 || quantity <= 0 ? sum2 : sum2 + quantity * (4 - index);
+  }, 0);
+  const potions = POTION_ITEMS.map(({ name, engine, ids }) => ({ name, engine, doses: dosesOf(ids) })).filter((p) => p.doses > 0);
+  const boost = (p, skill) => Math.max(0, ...p.engine.map((e) => PotionMap[e].calculateFn(skills)[skill] ?? 0));
+  const wanted = STYLE_SKILLS[combat];
+  const top = (skill) => Math.max(0, ...potions.map((p) => boost(p, skill)));
+  const useful = potions.filter((p) => wanted.some((skill) => boost(p, skill) > 0)).sort((a, b) => b.doses - a.doses);
+  const complete = useful.find((p) => wanted.every((skill) => boost(p, skill) === top(skill)));
+  if (complete) return [complete];
+  const perSkill = wanted.flatMap((skill) => useful.find((p) => boost(p, skill) === top(skill)) ?? []);
+  return [...new Set(perSkill)];
+}
+
 // src/core/bankMode.ts
 var COMBAT_STYLES = ["melee", "ranged", "magic"];
 var SETUPS_PER_STYLE = 3;
+var TIER_SWAPS = 2;
 var OTHER_SLOTS = SLOTS.filter((s) => s !== "weapon");
 var ENGINE_NAMED = new Set(engineNamedItems_default);
 var BLOCKING_ISSUES = /* @__PURE__ */ new Set([
@@ -331286,7 +331362,7 @@ var TopSetups = class {
     return [...this.byDps.values()].sort((a, b) => b.dps - a.dps);
   }
 };
-function searchAttack(template, attack, pool, worn, monster, top) {
+function searchAttack(template, attack, pool, worn, monster, top, maxSwaps) {
   const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
   if (slots.some((items) => items.plain.length === 0)) return;
   const effective = effectiveNamed(template, attack, slots, monster);
@@ -331305,6 +331381,8 @@ function searchAttack(template, attack, pool, worn, monster, top) {
     return searchDps(template, attack, bounded, monster);
   };
   const chooseOnStats = (open2, from) => {
+    const notChosen = new Set(open2.slice(from).map((i) => OTHER_SLOTS[i]));
+    if (SLOTS.filter((s) => !notChosen.has(s) && gear[s] !== worn[s]).length > maxSwaps) return;
     const dps = bound(open2, from);
     if (dps <= 0 || round3(dps) < top.floor()) return;
     if (from === open2.length) {
@@ -331334,9 +331412,9 @@ function searchAttack(template, attack, pool, worn, monster, top) {
   };
   chooseExact(0, []);
 }
-function rankStyle(template, combat, pool, worn, spellbook, monster) {
+function rankStyle(template, combat, pool, worn, spellbook, monster, maxSwaps = Infinity) {
   const top = new TopSetups();
-  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top);
+  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top, maxSwaps);
   return top.ranked();
 }
 function describe2(template, c, worn, monster) {
@@ -331371,7 +331449,7 @@ function planBankMode(state, request) {
     notEquipment
   } = collectOwned(state);
   const empty2 = Object.fromEntries(SLOTS.map((s) => [s, null]));
-  const template = buildPlayer(state, monster, { equipment: empty2 }).player;
+  const live = buildPlayer(state, monster, { equipment: empty2 }).player;
   const wanted = request.style ? [request.style] : COMBAT_STYLES;
   const styles = {};
   for (const combat of wanted) {
@@ -331380,8 +331458,38 @@ function planBankMode(state, request) {
       styles[combat] = { unavailable };
       continue;
     }
-    const ranked = withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster));
-    styles[combat] = ranked.length ? { setups: ranked.map((c) => describe2(template, c, worn, monster)).sort((a, b) => b.dps - a.dps) } : { unavailable: `No owned setup can attack with ${combat}.` };
+    let template = live;
+    let assumed = null;
+    if (request.boosts === "planned") {
+      const prayers = bestPrayers(combat, request.unlockedPrayers);
+      const potions = bestOwnedPotions(combat, live.skills, [...state.inventory, ...state.bank?.items ?? []]);
+      template = buildPlayer(state, monster, {
+        equipment: empty2,
+        prayers: prayers.map((p) => Prayer[p]),
+        potions: potions.flatMap((p) => p.engine.map((e) => Potion_default[e]))
+      }).player;
+      assumed = {
+        prayers: prayers.map((p) => PrayerMap[p].name),
+        potions: potions.map(({ name, doses }) => ({ name, doses }))
+      };
+    }
+    const rank = (maxSwaps) => withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster, maxSwaps));
+    const ranked = rank();
+    if (!ranked.length) {
+      styles[combat] = { unavailable: `No owned setup can attack with ${combat}.` };
+      continue;
+    }
+    const setups = ranked.map((c) => describe2(template, c, worn, monster)).sort((a, b) => b.dps - a.dps);
+    const within = (maxSwaps) => {
+      if (setups[0].swaps.length <= maxSwaps) return setups[0];
+      const [best] = rank(maxSwaps);
+      return best ? describe2(template, best, worn, monster) : null;
+    };
+    styles[combat] = {
+      setups,
+      assumed,
+      tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS), wearingNow: within(0) }
+    };
   }
   const notes = [...unknownWorn, ...drainNotes];
   if (notEquipment) {
@@ -331398,6 +331506,8 @@ function planBankMode(state, request) {
   }
   return {
     monster: { id: monster.id, name: monster.name, version: monster.version ?? "" },
+    defence: defenceAfterReductions(monster),
+    boosts: request.boosts,
     styles,
     bankAgeMs: state.bank?.ageMs ?? null,
     notes
@@ -331575,14 +331685,22 @@ function mdLoadout(l) {
     `- **On slayer task**: ${l.onSlayerTask ? "yes" : "no"}`
   ].join("\n");
 }
+var mdSwaps = (s) => s.swaps.map((w) => `${w.slot}: ${w.from ?? "empty"} \u2192 ${w.to ? `${w.to} [${w.source}]` : "empty"}`).join("; ");
 function mdSetup(s, rank) {
   const gear = Object.entries(s.items).filter(([, item]) => item).map(([slot, item]) => `${slot}: ${item.name} [${item.source}]`).join(" \xB7 ");
-  const swaps = s.swaps.map((w) => `${w.slot}: ${w.from ?? "empty"} \u2192 ${w.to ? `${w.to} [${w.source}]` : "empty"}`).join("; ");
   return [
     `${rank}. **${s.dps} DPS** \xB7 max hit ${s.maxHit} \xB7 accuracy ${s.accuracyPct}% \xB7 avg kill ${s.avgTtkSeconds ?? "?"}s \xB7 ${s.style}${s.spell ? ` \xB7 ${s.spell}` : ""}`,
     `   - **Gear**: ${gear || "(nothing equipped)"}`,
-    `   - **Swaps (${s.swaps.length})**: ${swaps || "none, this is what you wear now"}`
+    `   - **Swaps (${s.swaps.length})**: ${mdSwaps(s) || "none, this is what you wear now"}`
   ].join("\n");
+}
+function mdAssumed(assumed) {
+  const potions = assumed.potions.map((p) => `${p.name} (${p.doses} doses owned)`);
+  return `Assumed: ${assumed.prayers.join(" + ") || "no prayer"} \xB7 ${potions.join(" + ") || "no owned potion for this style"}`;
+}
+function mdTier(label, s) {
+  if (!s) return `- ${label}: no setup can attack with this style.`;
+  return `- ${label}: **${s.dps} DPS** \xB7 ${s.swaps.length ? `${s.swaps.length} swap${s.swaps.length > 1 ? "s" : ""} (${mdSwaps(s)})` : "no swap"}`;
 }
 var mdAge = (ms) => ms < 36e5 ? `${Math.max(0, Math.round(ms / 6e4))} min` : `${Math.round(ms / 36e5)} h`;
 function createServer() {
@@ -331702,18 +331820,24 @@ Example: "Tentacle vs Slayer helm (i) vs no prayer on Abyssal demons" ->
   });
   server.registerTool("osrs_best_owned_setup", {
     title: "Best owned OSRS setup",
-    description: `Rank the best setups the player OWNS against one monster version, per combat style (melee, ranged, magic). The owned pool is the worn gear, the inventory and the last bank snapshot from the DPS Bridge plugin. DPS comes from the OSRS Wiki DPS calculator engine with the player's live levels and prayers.
+    description: `Rank the best setups the player OWNS against one monster version, per combat style (melee, ranged, magic). The owned pool is the worn gear, the inventory and the last bank snapshot from the DPS Bridge plugin. DPS comes from the OSRS Wiki DPS calculator engine.
 
-Returns up to 3 setups per style: the 3 best overall. Setups with the same DPS count once (the one with the fewest swaps is shown), so two entries can use the same weapon. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
+Boosts: "planned" (default) assumes, per style, the best unlocked prayer and the best potion found in the inventory and bank, and names that potion with the doses owned. "live" uses the player's levels and prayers as they are now.
+
+Returns up to 3 setups per style: the 3 best overall. Setups with the same DPS count once (the one with the fewest swaps is shown), so two entries can use the same weapon. Each item carries where it is (worn / inventory / bank), and each setup lists the slots to swap from what is worn now. Each style also has 3 tiers with their DPS: best owned, the best within 2 swaps from what is worn, and wearing now. The monster's Defence level is given before and after the drains. A style that the phase makes impossible is "unavailable" (e.g. Maggot King "Far": no melee).
 
 Examples:
   - "Best setup I own vs Maggot King Far?" -> {monster: "Maggot King", monster_version: "Far"}
   - "Best ranged setup I own for Vorkath?" -> {monster: "Vorkath", monster_version: "Post-quest", style: "ranged"}
-  - "And after 2 DWH specs?" -> {monster: "Maggot King", monster_version: "Nearby", defence_reductions: {dwh_hits: 2}}
+  - "Plan Maggot King Nearby with 2 DWH" -> {monster: "Maggot King", monster_version: "Nearby", defence_reductions: {dwh_hits: 2}}
+  - "My real DPS options right now?" -> {monster: "Maggot King", monster_version: "Nearby", boosts: "live"}
+  - "I don't have Rigour or Augury" -> {..., unlocked_prayers: ["PIETY", "EAGLE_EYE", "MYSTIC_MIGHT"]}
 Use osrs_search_monsters for the exact monster_version. Prefer monster + monster_version to monster_id: the phases of one boss can share an id.`,
     inputSchema: strictObject({
       ...monsterFields,
       style: _enum(["melee", "ranged", "magic"]).optional().describe("One combat style. Omit to rank all three."),
+      boosts: _enum(["planned", "live"]).default("planned").describe("'planned' (default): the best unlocked prayer and the best owned potion of each style, for planning in the bank. 'live': the levels and prayers as they are now, for the real DPS at the boss."),
+      unlocked_prayers: array(_enum(VALID.prayers)).max(30).optional().describe(`The prayers that 'planned' can assume, e.g. ["PIETY", "EAGLE_EYE", "MYSTIC_MIGHT"]. Omit when the player has every prayer.`),
       response_format: responseFormat
     }),
     annotations: READ_ONLY
@@ -331724,15 +331848,32 @@ Use osrs_search_monsters for the exact monster_version. Prefer monster + monster
     else if (a.monster) monster = { name: a.monster, version: a.monster_version };
     else if (state.target) monster = state.target;
     else throw new Error('No target: the player is not fighting anything. Pass `monster` (e.g. "Maggot King") and `monster_version`.');
-    const plan = planBankMode(state, { monster, style: a.style, drains: toReductions(a.defence_reductions) });
+    const plan = planBankMode(state, {
+      monster,
+      style: a.style,
+      boosts: a.boosts,
+      unlockedPrayers: a.unlocked_prayers,
+      drains: toReductions(a.defence_reductions)
+    });
     const label = `${plan.monster.name}${plan.monster.version ? ` (${plan.monster.version})` : ""}`;
+    const { base, effective } = plan.defence;
     return reply(a.response_format, { ...plan }, () => [
       `# Best owned setups vs ${label}`,
+      plan.boosts === "planned" ? "Boosts: Planned (the best unlocked prayer and the best owned potion of each style)." : "Boosts: Live (the levels and prayers as they are now).",
+      effective !== base ? `Defence ${base} \u2192 **${effective}** after drains (-${Math.round((1 - effective / base) * 100)}%).` : `Defence ${base}.`,
       plan.bankAgeMs === null ? "Bank: no snapshot yet." : `Bank snapshot: ${mdAge(plan.bankAgeMs)} old.`,
       ...Object.entries(plan.styles).flatMap(([style, stylePlan]) => [
         "",
         `## ${style[0].toUpperCase()}${style.slice(1)}`,
-        "unavailable" in stylePlan ? `Unavailable: ${stylePlan.unavailable}` : stylePlan.setups.map((s, i) => mdSetup(s, i + 1)).join("\n")
+        "unavailable" in stylePlan ? `Unavailable: ${stylePlan.unavailable}` : [
+          ...stylePlan.assumed ? [mdAssumed(stylePlan.assumed)] : [],
+          ...stylePlan.setups.map((s, i) => mdSetup(s, i + 1)),
+          "",
+          "**Tiers**",
+          mdTier("Best owned", stylePlan.tiers.bestOwned),
+          mdTier("\u2264 2 swaps", stylePlan.tiers.upToTwoSwaps),
+          mdTier("Wearing now", stylePlan.tiers.wearingNow)
+        ].join("\n")
       ])
     ].join("\n") + mdNotes(plan.notes));
   });

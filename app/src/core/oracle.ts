@@ -33,6 +33,8 @@ export function exhaustiveSearch(
   state: LiveState,
   monsterSpec: { name: string; version?: string; reductions?: DefenceReductions },
   combat: CombatStyle,
+  /** Keep only the setups that change at most this many slots from what is worn. */
+  maxSwaps = Infinity,
 ): OracleSetup[] {
   const monster = resolveMonster(monsterSpec);
   const piece = (id: number | null | undefined): EquipmentPiece | null => {
@@ -89,6 +91,7 @@ export function exhaustiveSearch(
             if (calc.getDps() <= 0) return;
             const dps = round3(calc.getDps());
             const swaps = SLOTS.filter((s) => (equipment[s]?.id ?? null) !== (worn[s]?.id ?? null)).length;
+            if (swaps > maxSwaps) return;
             const known = best.get(dps);
             if (known && swaps === known.swaps) {
               known.ties++;
