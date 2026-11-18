@@ -315128,6 +315128,37 @@ function bestOwnedPotions(combat, skills, owned) {
   return [...new Set(perSkill)];
 }
 
+// src/core/thrall.ts
+var GREATER_THRALL_MAGIC_LEVEL = 76;
+var GREATER_THRALL_RUNES = [
+  { id: 554, quantity: 10 },
+  // FIRE_RUNE
+  { id: 565, quantity: 5 },
+  // BLOOD_RUNE
+  { id: 564, quantity: 1 }
+  // COSMIC_RUNE
+];
+var GREATER_THRALL = {
+  name: "Greater thrall",
+  dps: 0.625,
+  maxHit: 3,
+  attackSeconds: 2.4,
+  source: { url: "https://oldschool.runescape.wiki/w/Thralls", readOn: "2026-11-18" }
+};
+function thrallLine(state) {
+  if (state.spellbook !== "arceuus") return null;
+  const magic = state.boostedLevels?.magic ?? state.realLevels?.magic ?? 0;
+  if (magic < GREATER_THRALL_MAGIC_LEVEL) return null;
+  const owned = [
+    ...state.runePouch.map(({ runeItemId, quantity }) => ({ id: runeItemId, quantity })),
+    ...state.inventory,
+    ...state.bank?.items ?? []
+  ];
+  const count = (id) => owned.reduce((sum2, s) => s.id === id && s.quantity > 0 ? sum2 + s.quantity : sum2, 0);
+  if (GREATER_THRALL_RUNES.some(({ id, quantity }) => count(id) < quantity)) return null;
+  return GREATER_THRALL;
+}
+
 // src/core/bankMode.ts
 var COMBAT_STYLES = ["melee", "ranged", "magic"];
 var SETUPS_PER_STYLE = 3;
@@ -315504,6 +315535,7 @@ function planBankMode(state, request) {
     defence: defenceAfterReductions(monster),
     boosts: request.boosts,
     styles,
+    thrall: thrallLine(state),
     bankAgeMs: state.bank?.ageMs ?? null,
     notes
   };

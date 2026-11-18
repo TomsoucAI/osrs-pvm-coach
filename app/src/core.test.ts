@@ -3,3 +3,4 @@
 import './core/liveState.test';
 import './core/bankMode.test';
 import './core/bankModeBoosts.test';
+import './core/thrall.test';
