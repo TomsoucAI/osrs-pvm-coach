@@ -129,7 +129,7 @@ function collectOwned(state: LiveState) {
 
 // ---------- attacks: weapon + combat style (+ spell) ----------
 
-function combatStyleOf(style: PlayerCombatStyle): CombatStyle | null {
+export function combatStyleOf(style: PlayerCombatStyle): CombatStyle | null {
   if (style.type === 'magic' || style.type === 'ranged') return style.type;
   return style.type === null ? null : 'melee';
 }

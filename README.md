@@ -85,6 +85,18 @@ This launches a developer RuneLite client with the plugin loaded. Enable **DPS B
 
 **Jagex account login in the dev client:** click the Jagex auth panel icon in the sidebar → *Add Jagex Account* → log in → pick your character → *Play Now*. Next launches: pick the character → *Play Now*. (If you have an old `~/.runelite/credentials.properties` from the legacy method, delete it.)
 
+### 4. Bank-mode page (local web page)
+
+Two equipment pictures side by side for one boss and phase: what you wear now, and the best setup you own. Slots to swap have a gold outline. The page updates when the plugin's files change.
+
+```bash
+node app/dist/ui.js                                    # live: reads the plugin's state.json and bank.json
+node app/dist/ui.js --fixture app/fixtures/ironman-v2  # no game needed
+```
+Then open `http://127.0.0.1:4780/` (`--port <n>` changes the port). `app/dist/ui.js` and `app/dist/page/` are built bundles; no `npm install` needed.
+
+The server binds `127.0.0.1` only and has read-only endpoints. It answers a request only when `Host` is its own address and `Origin`, when the browser sends one, is its own origin (scheme, host and port). **Threat model:** this guard protects against websites, not against local programs. A local program can forge both headers, and it can read `state.json` and `bank.json` from disk with no server at all.
+
 ## Example prompts
 
 - "What's my DPS on what I'm fighting?"
