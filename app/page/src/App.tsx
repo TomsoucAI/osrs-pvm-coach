@@ -84,8 +84,10 @@ function BossPicker({ view, onPick }: { view: View; onPick: (boss: string, phase
   );
 }
 
-function Doll({ names, swapSlots, sources }: {
-  names: Record<Slot, string | null>; swapSlots: Set<Slot>; sources?: Setup['items'];
+function Doll({
+  names, ids, swapSlots, sources,
+}: {
+  names: Record<Slot, string | null>; ids: Record<Slot, number | null>; swapSlots: Set<Slot>; sources?: Setup['items'];
 }) {
   return (
     <div className="doll">
@@ -94,6 +96,10 @@ function Doll({ names, swapSlots, sources }: {
         : (
           <div key={slot} className={`slot ${swapSlots.has(slot) ? 'swap' : ''}`} data-slot={slot}>
             <span className="slot-key">{slot}</span>
+            {/* The name stays under the icon, so a missing icon (404) leaves the name. */}
+            {ids[slot] !== null && (
+              <img key={ids[slot]} className="slot-icon" src={`/api/icon?id=${ids[slot]}`} alt="" onError={(e) => { e.currentTarget.hidden = true; }} />
+            )}
             <span className="slot-name">{names[slot] ?? '—'}</span>
             {sources?.[slot] && <span className={`badge ${sources[slot].source}`}>{sources[slot].source}</span>}
           </div>
@@ -147,6 +153,7 @@ export function App() {
   const swapSlots = new Set(best?.swaps.map((s) => s.slot));
   const dpsNow = summary?.now && 'dps' in summary.now ? summary.now : null;
   const bestNames = best && Object.fromEntries(SLOTS.map((s) => [s, best.items[s]?.name ?? null])) as Record<Slot, string | null>;
+  const bestIds = best && Object.fromEntries(SLOTS.map((s) => [s, best.items[s]?.id ?? null])) as Record<Slot, number | null>;
 
   return (
     <div className={`page ${live ? '' : 'offline'}`}>
@@ -176,12 +183,12 @@ export function App() {
         <main className="data">
           {!view.boss && <div className="panel muted">Search a boss on the left to start.</div>}
           {view.boss && !sameView && <div className="panel muted">{live ? 'Loading…' : 'Offline: no data for this boss yet. Log in with the DPS Bridge plugin on.'}</div>}
-          {sameView && summary?.worn && (
+          {sameView && summary?.worn && summary.wornIds && (
             <>
               <div className="dolls">
                 <section className="panel">
                   <h2>Wearing now{dpsNow ? ` · ${dpsNow.dps.toFixed(2)} DPS` : ''}</h2>
-                  <Doll names={summary.worn} swapSlots={swapSlots} />
+                  <Doll names={summary.worn} ids={summary.wornIds} swapSlots={swapSlots} />
                 </section>
                 <div className="arrow">
                   <div className="big gold">→</div>
@@ -189,8 +196,8 @@ export function App() {
                 </div>
                 <section className="panel">
                   <h2>Best you own{best ? ` · ${best.dps.toFixed(2)} DPS` : ''}</h2>
-                  {best && bestNames
-                    ? <Doll names={bestNames} swapSlots={swapSlots} sources={best.items} />
+                  {best && bestNames && bestIds
+                    ? <Doll names={bestNames} ids={bestIds} swapSlots={swapSlots} sources={best.items} />
                     : <div className="bad">{stylePlan && 'unavailable' in stylePlan ? stylePlan.unavailable : 'No setup.'}</div>}
                 </section>
               </div>
@@ -240,6 +247,10 @@ export function App() {
           </div>
         </aside>
       </div>
+      <footer className="muted credit">
+        Item icons © Jagex Ltd., from the <a href="https://oldschool.runescape.wiki/" rel="noreferrer" target="_blank">Old School RuneScape Wiki</a>.
+        Not affiliated with or endorsed by Jagex.
+      </footer>
     </div>
   );
 }

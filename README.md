@@ -1,29 +1,51 @@
-# OSRS DPS MCP
+# OSRS PvM Coach
 
 [![CI](https://github.com/TomsoucAI/osrs-pvm-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/TomsoucAI/osrs-pvm-coach/actions/workflows/ci.yml)
 
-Ask Claude "what's my DPS on Vorkath?" and get the answer from your **live** RuneLite gear, boosted levels (potions), active prayers, attack style and current target, calculated by the **OSRS Wiki DPS calculator engine** (`weirdgloop/osrs-dps-calc`), the same maths as https://tools.runescape.wiki/osrs-dps.
+## What it does
+
+A read-only RuneLite plugin exports your live gear, levels, prayers, target, inventory and bank to local JSON files.
+A Node core reads those files and calculates DPS with the **OSRS Wiki DPS calculator engine** (`weirdgloop/osrs-dps-calc`), including the best setup you own for a boss.
+Two front ends share that core: an MCP server for Claude (Code or Desktop) and a local bank-mode web page.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph PC["Your PC"]
+    subgraph PC["Your PC (our code makes no internet requests)"]
         RL["RuneLite client"]
-        DB["DPS Bridge plugin<br/>(read-only)"]
+        PL["plugin/<br/>DPS Bridge (read-only)"]
+        F[("state.json + bank.json<br/>~/.runelite/plugin-data/dps_bridge/")]
+        CORE["app/src/core + snapshot.ts<br/>readState, getSnapshot, planBankMode<br/>Wiki DPS engine"]
+        MCP["app/dist/index.js<br/>MCP server (stdio)"]
+        UI["app/dist/ui.js<br/>UI server 127.0.0.1:4780"]
         WS["WikiSync plugin<br/>(fallback)"]
-        SJ[("state.json<br/>~/.runelite/plugin-data/dps_bridge/")]
-        MCP["MCP server<br/>OSRS Wiki DPS engine"]
     end
     C["Claude<br/>(Code or Desktop)"]
+    B["Browser<br/>bank-mode page"]
 
-    RL --> DB
-    DB -->|writes on change| SJ
-    SJ -->|reads| MCP
+    RL --> PL
+    PL -->|writes on change| F
+    F -->|reads| CORE
+    CORE --> MCP
+    CORE --> UI
     RL --> WS
     WS -.->|"WebSocket :37767"| MCP
-    MCP -->|"DPS, max hit, TTK"| C
+    MCP -->|"DPS, max hit, TTK, best owned setup"| C
+    UI -->|"plan + live push"| B
 ```
 
-## Tools
+| Folder | What it is | Language |
+|---|---|---|
+| `plugin/` | DPS Bridge RuneLite plugin. Reads game state, writes the two JSON files. No other output. | Java 11 (build with JDK 21) |
+| `app/src/core/` | Shared core: reads both files (`liveState.ts`) and ranks owned setups (`bankMode.ts`) | TypeScript |
+| `app/src/snapshot.ts`, `app/src/calc.ts` | State reader for the first four MCP tools (with the WikiSync fallback), and the engine wrapper | TypeScript |
+| `app/src/index.ts` | `mcp` entry point: the MCP tools below | TypeScript |
+| `app/src/ui.ts`, `app/src/ui/`, `app/page/` | `ui` entry point: HTTP server and the React page | TypeScript |
+| `app/dist/` | Built, self-contained bundles. Committed, so users run them with no `npm install` | JavaScript |
+| `app/fixtures/` | Sample plugin files for work without the game | JSON |
+
+MCP tools:
 
 | Tool | What it does |
 |---|---|
@@ -33,142 +55,166 @@ flowchart LR
 | `osrs_best_owned_setup` | Best setups you **own** (worn gear, inventory, last bank snapshot) vs one monster, per combat style |
 | `osrs_search_monsters` | Find exact monster name/version/id |
 
-## Is it safe for my account?
+The UI server binds `127.0.0.1` only and has read-only endpoints. It answers a request only when `Host` is its own address and `Origin`, when the browser sends one, is its own origin (scheme, host and port). **Threat model:** this guard protects against websites, not against local programs. A local program can forge both headers, and it can read `state.json` and `bank.json` from disk with no server at all.
 
-- The plugin only **reads** game state and writes a local JSON file. It never sends input or clicks.
-- Nothing asks for, reads or stores your password. The MCP server makes no internet requests.
-- Details: [Account safety](#account-safety) and [Legality gate](#legality-gate-dont-get-banned).
-
-## Quick start
-
-Prerequisites: [Node](https://nodejs.org) 20.3+, git, and JDK 21 for the plugin (`winget install EclipseAdoptium.Temurin.21.JDK` on Windows).
-
-```bash
-git clone https://github.com/TomsoucAI/osrs-pvm-coach.git
-cd osrs-pvm-coach
-node install.mjs
-```
-
-`install.mjs` adds the DPS MCP to Claude Code and Claude Desktop (`node install.mjs --dry-run` shows what it would do). Then follow [TESTING.md](TESTING.md).
-
-## Setup options
-
-### 1. MCP server only (Node 20.3+)
-
-`app/dist/index.js` is a self-contained bundle (engine + item/monster data); no `npm install` needed.
-
-**Claude Code:**
-```bash
-claude mcp add osrs-dps -- node /ABSOLUTE/PATH/osrs-pvm-coach/app/dist/index.js
-```
-
-**Claude Desktop** (`claude_desktop_config.json`):
-```json
-{ "mcpServers": { "osrs-dps": { "command": "node", "args": ["C:\\path\\osrs-pvm-coach\\app\\dist\\index.js"] } } }
-```
-
-### 2. Zero-Java: WikiSync fallback
-
-Install **WikiSync** from the RuneLite Plugin Hub. The MCP reads your gear + base levels from it automatically. WikiSync doesn't expose boosts, prayers, style or target, so pass them in the prompt ("with Piety and super combat, on Vorkath").
-
-### 3. DPS Bridge RuneLite plugin (full live data)
-
-Adds what WikiSync lacks: **boosted levels (potions auto-detected), active prayers, attack style, current target, slayer task, inventory, bank snapshot, and your own landed DWH / Elder maul / BGS specs**. Read-only: it writes a JSON file on change, never sends input.
-
-The plugin is **not on the Plugin Hub yet**, so it runs only in RuneLite's developer client:
-
-```bash
-cd plugin
-./gradlew run          # Windows: gradlew.bat run
-```
-This launches a developer RuneLite client with the plugin loaded. Enable **DPS Bridge** in the plugin list.
-
-**Jagex account login in the dev client:** click the Jagex auth panel icon in the sidebar → *Add Jagex Account* → log in → pick your character → *Play Now*. Next launches: pick the character → *Play Now*. (If you have an old `~/.runelite/credentials.properties` from the legacy method, delete it.)
-
-### 4. Bank-mode page (local web page)
-
-Two equipment pictures side by side for one boss and phase: what you wear now, and the best setup you own. Slots to swap have a gold outline. The page updates when the plugin's files change.
-
-```bash
-node app/dist/ui.js                                    # live: reads the plugin's state.json and bank.json
-node app/dist/ui.js --fixture app/fixtures/ironman-v2  # no game needed
-```
-Then open `http://127.0.0.1:4780/` (`--port <n>` changes the port). `app/dist/ui.js` and `app/dist/page/` are built bundles; no `npm install` needed.
-
-The server binds `127.0.0.1` only and has read-only endpoints. It answers a request only when `Host` is its own address and `Origin`, when the browser sends one, is its own origin (scheme, host and port). **Threat model:** this guard protects against websites, not against local programs. A local program can forge both headers, and it can read `state.json` and `bank.json` from disk with no server at all.
-
-## Example prompts
-
-- "What's my DPS on what I'm fighting?"
-- "Compare my current setup vs tentacle vs Slayer helm (i) on Abyssal demon"
-- "Vorkath: no spec vs 1 DWH vs 2 DWH vs elder maul, what does each do to my DPS?"
-- "Piety + divine super combat vs Ultimate strength + super combat on Vorkath post-quest, which is worth it?"
-- "What's the best melee setup I own for Vorkath?"
-
-## Limits
+Known limits:
 
 - The autocast spell isn't read from the game: pass `spell` for standard staves (powered staves are automatic).
 - Special attack hits and ToA/CoX scaling inputs aren't exposed yet; the engine supports them. Defence drains from specs are supported (`defence_reductions`).
 - Soulreaper axe stacks default to 5 (Wiki calc default).
 
-## Account safety
+## Legality rules and the never list
 
-- Nothing here asks for, reads or stores your password. The MCP makes no internet requests; it reads a local file (or WikiSync on localhost). The plugin writes gear/levels/prayers/target only.
-- Dev client login goes through Jagex's own login window. The session is stored encrypted in `~/.runelite/jagex-accounts.dat`; the key is in Windows Credential Manager / macOS Keychain. No password is stored.
-- If you ever created `~/.runelite/credentials.properties` (old method), delete it.
+A plugin that breaks Jagex's or RuneLite's rules can get its users banned. Read this before you change anything.
+
+<!-- never-list: keep this block identical in README.md and AGENTS.md -->
+The plugin reads game state and writes local files. The app reads those files and answers questions before a trip. Never build any of these:
+
+1. **No game input.** No code sends clicks, key presses, mouse moves, menu actions or camera moves to the game client.
+2. **No modified client.** Run the official RuneLite client or its developer client (`gradlew run`). Never an injected, patched or third-party client.
+3. **No HTTP from the plugin.** The plugin opens no socket and no server, and calls no URL. Its only output is files under `~/.runelite/plugin-data/dps_bridge/`.
+4. **No in-fight prayer, attack or position prompts.** Nothing tells the player what to pray, what to attack or where to stand during a fight. The allowed output is planning: gear, DPS, a defence number.
+5. **No Computer Use.** No agent reads the screen or drives the game window, keyboard or mouse. Agents get game data from the plugin's files and the MCP tools only.
+<!-- /never-list -->
+
+Two layers enforce the rules, because legality is about what a feature *does*, and code patterns only catch the obvious cases:
+
+| Layer | When | What |
+|---|---|---|
+| Maintainer verdict (`osrs-legality-gate` skill) | Before any new or changed plugin feature, recorded on the issue | GREEN / AMBER / RED verdict against RuneLite's official rules and Plugin Hub precedent. RED features are refused |
+| [`plugin/tools/legal-lint.mjs`](plugin/tools/legal-lint.mjs) | After every edit (Claude Code hook, with Claude Code opened at the repo root), in CI on every PR, or `node tools/legal-lint.mjs` in `plugin/` | RED: forbidden code (input injection, menu actions, autotype, reflection, servers…). The hook reports it to Claude after the edit; CI fails the PR. AMBER: risky APIs (projectiles, prayer tab, NPC targeting, sounds…) need a `// legal-gate: GREEN <reason>` line |
+
+[`plugin/AGENTS.md`](plugin/AGENTS.md) is RuneLite's official agent guide (copied from `runelite/example-plugin`, imported by `plugin/CLAUDE.md`): Java 11, Filepath for file I/O, combat restrictions. No tool guarantees anything: the Plugin Hub review is the strongest check there is. If a feature wouldn't pass it, don't run it locally either.
+
+### Account safety
+
+- Nothing here asks for, reads or stores your password. The MCP and the UI server make no internet requests. They read local files, and the MCP also reads WikiSync on localhost. Claude gets the answers that the MCP returns.
+- Dev client login goes through Jagex's own login window. The session is stored encrypted in `~/.runelite/jagex-accounts.dat`; the key is in Windows Credential Manager. No password is stored.
+- If you ever created `~/.runelite/credentials.properties` (old login method), delete it.
 - The repo-root `.claude/settings.json` denies Claude Code's `Read` and `Edit` of `credentials.properties` and `jagex-accounts.dat`. This also blocks Bash commands that name the file (`cat`, `head`, redirections). **Residual risk:** it does not block a command that reads the file without naming it (`grep -r`) or a subprocess (`node -e`, `sh -c`). Only the Claude Code sandbox closes that gap, and it does not run on native Windows (WSL2 only). A read gives an encrypted session, not your password. Accepted for now; see #30.
 - `install.mjs` installs no third-party skills or MCP servers. Don't add other people's MCP servers, skills or "RuneLite" downloads without reading them: they run with your user's permissions.
 - Turn on 2-step authentication on your Jagex account.
 
-## Legality gate (don't get banned)
+## Setup on Windows
 
-Two layers, because legality is about what a feature *does*, and code patterns only catch the obvious cases:
+Prerequisites: git, Node 20.3 or later, and JDK 21 for the plugin. Reopen the terminal after you install them.
 
-| Layer | When | What |
-|---|---|---|
-| Maintainer verdict (`osrs-legality-gate` skill) | Before any new/changed feature | GREEN / AMBER / RED verdict against RuneLite's official rules + Plugin Hub precedent |
-| [`plugin/tools/legal-lint.mjs`](plugin/tools/legal-lint.mjs) | After every edit (Claude Code hook, with Claude Code opened at the repo root), in CI on every PR, or `node tools/legal-lint.mjs` in `plugin/` | RED: forbidden code (input injection, menu actions, autotype, reflection, servers…) blocks the edit. AMBER: risky APIs (projectiles, prayer tab, NPC targeting, sounds…) need a `// legal-gate: GREEN <reason>` line |
-
-No tool guarantees anything: the Plugin Hub review is the strongest check there is. If a feature wouldn't pass it, don't run it locally either.
-
-## Help, security and contributing
-
-- Questions and bugs: [open an issue](https://github.com/TomsoucAI/osrs-pvm-coach/issues).
-- Security problems: do not open a public issue; see [SECURITY.md](SECURITY.md).
-- Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md). One maintainer; a hobby project.
-
-## For contributors
-
-### Updating the calculator data
-
-New items/bosses come from the Wiki calc repo:
-```bash
-cd app
-npm install
-npm run setup           # clones engine at the pinned commit into ../vendor
-npm run update-calc     # or: pull latest engine + data and rebuild
-npm test                # offline self-tests
+```powershell
+winget install --id Git.Git --exact
 ```
 
-### Building with Claude Code
+```powershell
+winget install --id OpenJS.NodeJS.LTS --exact
+```
 
-[`plugin/AGENTS.md`](plugin/AGENTS.md) is RuneLite's official agent guide (copied from `runelite/example-plugin`, with `CLAUDE.md` importing it). Claude Code loads it automatically, so plugin changes follow Plugin Hub rules: Java 11, Filepath for file I/O, no input injection, combat restrictions.
+```powershell
+winget install --id EclipseAdoptium.Temurin.21.JDK --exact
+```
 
-### Quality checks
+Clone the repo:
+
+```powershell
+git clone https://github.com/TomsoucAI/osrs-pvm-coach.git
+```
+
+```powershell
+cd osrs-pvm-coach
+```
+
+Register the MCP server with Claude Code (user scope) and Claude Desktop. `--dry-run` shows what it would do first:
+
+```powershell
+node install.mjs --dry-run
+```
+
+```powershell
+node install.mjs
+```
+
+Then fully quit Claude Desktop (tray icon → Quit) and reopen it. Ask Claude "What's my DPS on what I'm fighting?" or "What's the best melee setup I own for Vorkath?".
+
+**The plugin** is not on the Plugin Hub yet, so it runs only in RuneLite's developer client. The first run downloads Gradle and RuneLite (2–5 min):
+
+```powershell
+cd plugin; .\gradlew.bat run
+```
+
+In the developer client: sidebar → Jagex auth panel → *Add Jagex Account* → log in → pick your character → *Play Now*. Then wrench (Configuration) → search **DPS Bridge** → turn it on. [TESTING.md](TESTING.md) has the in-game checks, level by level.
+
+**No Java?** Install **WikiSync** from the RuneLite Plugin Hub instead. The MCP reads your gear and base levels from it. WikiSync doesn't expose boosts, prayers, style, target or bank, so pass them in the prompt ("with Piety and super combat, on Vorkath").
+
+## Fixtures vs live
+
+Every entry point reads the plugin's files. **Live** is the default: `%USERPROFILE%\.runelite\plugin-data\dps_bridge\state.json` and `bank.json` next to it. **Fixtures** are sample files in the same format, so you can work with no game login.
+
+| Fixture | Contents |
+|---|---|
+| `app/fixtures/ironman-v2/` | Sample ironman: state, bank, rune pouch, spellbook. `reference-dps.json` holds the Wiki-calculator numbers the tests pin |
+| `app/fixtures/oracle-small/` | Small bank for the brute-force optimizer test |
+| `app/fixtures/spec-drains/` | State with counted DWH / Elder maul / BGS drains on a target |
+| `app/fixtures/logged-out/` | Logged-out state (v1) |
+| `examples/state.sample.json` | Original v1 state (no bank), used by the smoke test |
+
+Run these from the repo root.
+
+**Bank-mode page on a fixture**, then open `http://127.0.0.1:4780/` (`--port <n>` changes the port; Ctrl+C stops it):
+
+```powershell
+node app/dist/ui.js --fixture app/fixtures/ironman-v2
+```
+
+**What the MCP sees, on a fixture** (prints gear, levels, bank and DPS):
+
+```powershell
+node app/dist/inspect.js --file app/fixtures/ironman-v2/state.json
+```
+
+**The MCP server on a fixture.** It talks over stdio, so it prints one line and waits for a client; Ctrl+C stops it. `DPS_BRIDGE_FILE` picks the state file, and `bank.json` is read from the same folder:
+
+```powershell
+$env:DPS_BRIDGE_FILE = "$PWD\app\fixtures\ironman-v2\state.json"; node app/dist/index.js
+```
+
+To ask Claude Code questions against the fixture, register it under a second name in this folder only (`claude mcp remove osrs-dps-fixture` undoes it):
+
+```powershell
+claude mcp add osrs-dps-fixture -e DPS_BRIDGE_FILE="$PWD\app\fixtures\ironman-v2\state.json" -- node "$PWD\app\dist\index.js"
+```
+
+**Live:** the same commands without the fixture. Start the plugin first (`.\gradlew.bat run` in `plugin/`). Run `Remove-Item Env:DPS_BRIDGE_FILE` first if you set it in this terminal.
+
+```powershell
+node app/dist/ui.js
+```
+
+```powershell
+node app/dist/inspect.js --watch
+```
+
+## Workflow
+
+- **Issues.** Bugs, ideas and specs live in [GitHub Issues](https://github.com/TomsoucAI/osrs-pvm-coach/issues). Labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` ([docs/agents/triage-labels.md](docs/agents/triage-labels.md)).
+- **Specs.** A feature starts as a spec issue (for example #1, Bank mode) with user stories, decisions, test seams and out-of-scope items. It is sliced into ticket issues, each with acceptance criteria and an **Owner verifies:** line for the check that only a human can do (often in game). A plugin ticket carries its legality verdict before any code.
+- **Pull requests.** Branch from `main`, one ticket per PR, squash-merged. Nobody pushes to `main`. If you change `app/src/`, commit the rebuilt `app/dist/` (`npm test` rebuilds it). Details: [CONTRIBUTING.md](CONTRIBUTING.md).
+- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every PR, and all three jobs must pass before a merge: `legal-lint`, the app (`npm ci`, `npm run setup` clones the engine at the pinned commit, `npm test`), and the plugin Gradle build.
+- **Security problems:** do not open a public issue; see [SECURITY.md](SECURITY.md).
+
+Checks to run locally (in `app/`, after `npm ci` and `npm run setup`):
 
 | Check | Command (in `app/`) |
 |---|---|
-| MCP smoke test (all tools, errors, pagination), uses the prebuilt `dist/` | `npm install && npm run smoke` |
-| Rebuild from source + all tests | `npm run setup && npm test` |
+| Rebuild from source + all tests (selftest, core, UI server, MCP smoke) | `npm test` |
+| MCP smoke test only, on the prebuilt `dist/` | `npm run smoke` |
 | Strict type-check of our code | `npx tsc -p .` (errors listed under `../vendor/` are the Wiki calc's own, unchanged) |
 | Interactive explorer | `npx @modelcontextprotocol/inspector node dist/index.js` |
-| LLM evaluation (10 questions, needs `ANTHROPIC_API_KEY`) | `cd ../evals && pip install -r requirements.txt && python evaluation.py evaluation.xml -t stdio -c node -a ../app/dist/index.js -e DPS_BRIDGE_FILE=../examples/state.sample.json` |
+| Pull the latest engine + data and rebuild | `npm run update-calc` |
+| LLM evaluation (optional: 10 questions, needs Python 3 and `ANTHROPIC_API_KEY`) | `cd ../evals; pip install -r requirements.txt; python evaluation.py evaluation.xml -t stdio -c node -a ../app/dist/index.js -e DPS_BRIDGE_FILE=../examples/state.sample.json` |
 
-## License
+Plugin checks (in `plugin/`): `.\gradlew.bat build` and `node tools/legal-lint.mjs` (no RED).
 
-- `app/` (MCP server): GPL-3.0, see [`app/LICENSE`](app/LICENSE). It bundles the calculator engine (weirdgloop/osrs-dps-calc), which is GPL-3.0, so the bundled `dist/` is GPL-3.0 too.
-- `plugin/` (RuneLite plugin): BSD-2, see [`plugin/LICENSE`](plugin/LICENSE), as the Plugin Hub requires.
+## Licences
 
-## Credits
+- `app/` (MCP server, UI server, page): GPL-3.0, see [`app/LICENSE`](app/LICENSE). It bundles the calculator engine (weirdgloop/osrs-dps-calc), which is GPL-3.0, so the bundled `dist/` is GPL-3.0 too.
+- `plugin/` (RuneLite plugin): BSD-2, see [`plugin/LICENSE`](plugin/LICENSE). The Plugin Hub requires a permissive licence.
 
-DPS maths: the [OSRS Wiki DPS calculator](https://github.com/weirdgloop/osrs-dps-calc). Built on [RuneLite](https://github.com/runelite/runelite). Fallback data: WikiSync. Not affiliated with Jagex, RuneLite or the OSRS Wiki.
+Credits: DPS maths from the [OSRS Wiki DPS calculator](https://github.com/weirdgloop/osrs-dps-calc). Built on [RuneLite](https://github.com/runelite/runelite). Fallback data: WikiSync. Not affiliated with Jagex, RuneLite or the OSRS Wiki.
