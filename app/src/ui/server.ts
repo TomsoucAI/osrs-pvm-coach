@@ -16,6 +16,7 @@ import {
 } from '../core/bankMode';
 import { readState, type LiveState } from '../core/liveState';
 import { phaseUnavailable } from '../core/phaseRules';
+import { createIconCache } from './icons';
 
 export interface UiServerOptions {
   /** 0 = any free port. */
@@ -24,6 +25,10 @@ export interface UiServerOptions {
   bankFile: string;
   /** The built page (Vite output). Static files come from this folder only. */
   pageDir: string;
+  /** Where item icons are kept after the first fetch. */
+  iconCacheDir: string;
+  /** The wiki fetch. Tests replace it; the app uses the global `fetch`. */
+  fetchIcon?: typeof fetch;
 }
 
 export interface UiServer {
@@ -38,6 +43,8 @@ export interface StateSummary {
   playerName: string | null;
   bankAgeMs: number | null;
   worn: Record<Slot, string | null> | null;
+  /** The same slots as item ids, for the icons. */
+  wornIds: Record<Slot, number | null> | null;
   /** Null when the request names no monster, or when the player is logged out. */
   now: { dps: number; maxHit: number; accuracyPct: number; avgTtkSeconds: number | null } | { unavailable: string } | null;
 }
@@ -81,9 +88,10 @@ function monsterOf(query: URLSearchParams): { name: string; version?: string } |
 function summarize(state: LiveState, monsterQuery: { name: string; version?: string } | null): StateSummary {
   if (!state.loggedIn) {
     return {
-      loggedIn: false, playerName: null, bankAgeMs: state.bank?.ageMs ?? null, worn: null, now: null,
+      loggedIn: false, playerName: null, bankAgeMs: state.bank?.ageMs ?? null, worn: null, wornIds: null, now: null,
     };
   }
+  const wornIds = Object.fromEntries(SLOTS.map((slot) => [slot, state.equipment?.[slot] ?? null])) as Record<Slot, number | null>;
   const worn = Object.fromEntries(SLOTS.map((slot) => {
     const id = state.equipment?.[slot];
     return [slot, id === null || id === undefined ? null : findItem(id)?.name ?? `Item ${id}`];
@@ -106,7 +114,7 @@ function summarize(state: LiveState, monsterQuery: { name: string; version?: str
     }
   }
   return {
-    loggedIn: true, playerName: state.playerName ?? null, bankAgeMs: state.bank?.ageMs ?? null, worn, now,
+    loggedIn: true, playerName: state.playerName ?? null, bankAgeMs: state.bank?.ageMs ?? null, worn, wornIds, now,
   };
 }
 
@@ -128,6 +136,7 @@ async function listPage(pageDir: string): Promise<Map<string, string>> {
 export async function startUiServer(options: UiServerOptions): Promise<UiServer> {
   const streams = new Set<ServerResponse>();
   const pageFiles = await listPage(options.pageDir);
+  const icons = createIconCache(options.iconCacheDir, options.fetchIcon ?? fetch);
   /** Set once the server listens: `http://127.0.0.1:<port>` and `http://localhost:<port>`. */
   let ownOrigins = new Set<string>();
 
@@ -176,6 +185,15 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
         const q = query.get('q') ?? '';
         const hits = q.length < 2 ? [] : searchMonsters(q).slice(0, 50).map(({ name, version }) => ({ name, version }));
         return sendJson(res, 200, hits);
+      }
+      case '/api/icon': {
+        const id = query.get('id') ?? '';
+        if (!/^\d{1,9}$/.test(id)) throw new HttpError(400, 'The "id" parameter is an item id.');
+        const icon = await icons.get(Number(id));
+        if (!icon) throw new HttpError(404, 'No icon for this item.');
+        // Icons do not change: the browser may keep them (the other replies stay no-store).
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=86400' });
+        return res.end(icon);
       }
       case '/api/events':
         res.writeHead(200, { 'Content-Type': 'text/event-stream' });

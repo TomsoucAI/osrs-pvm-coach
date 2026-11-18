@@ -48,6 +48,7 @@ input, select { background: var(--panel2); border: 1px solid var(--line); border
 .slot.empty { visibility: hidden; }
 .slot.swap { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(224, 180, 76, .2) inset; }
 .slot-key { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.slot-icon { width: 36px; height: 32px; object-fit: contain; image-rendering: pixelated; align-self: center; }
 .slot-name { flex: 1; overflow-wrap: anywhere; }
 .badge { align-self: flex-start; font-size: 10px; padding: 0 5px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); }
 .badge.bank { color: var(--gold); border-color: var(--gold); }
@@ -61,6 +62,9 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .tile { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 6px; font-size: 11px; }
 .tile-value { font-size: 16px; font-weight: 700; color: var(--text); }
+
+.credit { margin-top: 16px; font-size: 11px; text-align: center; }
+.credit a { color: inherit; }
 
 /* Offline: the last known data stays on screen, greyed, so stale numbers are not trusted by mistake. */
 .offline .data { filter: grayscale(1); opacity: .45; }

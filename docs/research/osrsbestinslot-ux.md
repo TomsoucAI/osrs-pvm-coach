@@ -67,4 +67,9 @@ Tom's rule (2026-11-16): the wiki's strategy pages (https://oldschool.runescape.
 ## 6. Open questions for the spec
 
 - Item icons: source and licence (the OSRS Wiki serves item images; check its terms before bundling or hotlinking).
+  **Answered 2026-11-18 (#10): the terms do not allow it. Tom accepted the risk, and the page shows icons (option B).**
+  - Jagex holds the copyright of the item icons. The wiki uses them with Jagex's permission, and no Creative Commons licence covers them. Sources: the [Weird Gloop licensing page](https://meta.weirdgloop.org/w/Licensing) ("Non-text files" section) and the licence box on an item file page, for example [File:Abyssal whip.png](https://oldschool.runescape.wiki/w/File:Abyssal_whip.png). Crediting the wiki gives us no right to the images.
+  - Jagex's [Fan Content Policy](https://legal.jagex.com/docs/policies/fan-content-policy) (version 1.4, 29 September 2026), clause 6.1.3, forbids Jagex Property in "companion, guide and other apps aimed at supporting or improving gameplay". The bank-mode page is such an app. Clause 6.1.3 makes one exception: modifications and plugins that are part of official programs (clause 4.1.6).
+  - Other fan tools do the same. For example, oldschool.tools serves its own copies of the item icons. Jagex usually asks first, before it takes other action (clause 9.1). This is tolerance, not a licence.
+  - **Decision (Tom, 2026-11-18): build ADR-3 as written, and accept the risk.** The UI server fetches each icon from the wiki on first use and keeps it in `~/.osrs-pvm-coach/icons/`. The page credits Jagex and the wiki. If Jagex objects, ADR-3's exit path ("show names only") still applies: the page already shows the name under each icon. To remove the risk, get a separate agreement with Jagex (clause 14.1; contact `IP@Jagex.com`, clause 16.1).
 - Quest/unlock data for the Playbook's "unlocks you still need" (not exported today).

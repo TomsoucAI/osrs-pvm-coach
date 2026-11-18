@@ -25,10 +25,10 @@ before(async () => {
   const page = join(dir, 'page');
   await cp(join(dir, 'index.html'), join(page, 'index.html'));
   server = await startUiServer({
-    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: page,
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'),
   });
   loggedOut = await startUiServer({
-    port: 0, stateFile: join(dir, 'logged-out', 'state.json'), bankFile: join(dir, 'logged-out', 'bank.json'), pageDir: page,
+    port: 0, stateFile: join(dir, 'logged-out', 'state.json'), bankFile: join(dir, 'logged-out', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'),
   });
 });
 
@@ -157,7 +157,7 @@ test('a change to the bank file pushes a "changed" event', async () => {
 test('with no plugin folder yet, the server starts, answers 503, and pushes once the plugin writes its files', async () => {
   const folder = join(dir, 'not-yet');
   const early = await startUiServer({
-    port: 0, stateFile: join(folder, 'state.json'), bankFile: join(folder, 'bank.json'), pageDir: join(dir, 'page'),
+    port: 0, stateFile: join(folder, 'state.json'), bankFile: join(folder, 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'),
   });
   try {
     const reply = await send('/api/state', { on: early });
@@ -268,6 +268,155 @@ test('an error reply has no stack trace and no file path', async () => {
     assert.equal(typeof JSON.parse(reply.body).error, 'string');
     assert.ok(!/\bat \w|[\\/]fixture|[A-Z]:\\|\.json|\.ts/.test(reply.body), reply.body);
   }
+});
+
+// Item icons (ticket #10): the wiki fetch is the external boundary, so a fake replaces it.
+const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('fake icon')]);
+const WHIP = 4151;
+
+interface WikiCall { url: string; headers: Record<string, string> }
+
+/** A fake wiki: answers each URL from `files`, records each call, and fails like a lost network while `net.offline`. */
+function fakeWiki(files: Record<string, { status?: number; type?: string; body: Buffer }>, net: { offline?: boolean } = {}) {
+  const calls: WikiCall[] = [];
+  const fetchIcon = (async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(input), headers: Object.fromEntries(new Headers(init?.headers).entries()) });
+    if (net.offline) throw new TypeError('fetch failed');
+    const file = files[String(input)];
+    if (!file) return new Response('no such file', { status: 404 });
+    return new Response(new Uint8Array(file.body), { status: file.status ?? 200, headers: { 'Content-Type': file.type ?? 'image/png' } });
+  }) as typeof fetch;
+  return { calls, fetchIcon };
+}
+
+const WHIP_URL = 'https://oldschool.runescape.wiki/images/Abyssal_whip.png';
+
+async function iconServer(cacheDir: string, fetchIcon: typeof fetch) {
+  return startUiServer({
+    port: 0,
+    stateFile: join(dir, 'fixture', 'state.json'),
+    bankFile: join(dir, 'fixture', 'bank.json'),
+    pageDir: join(dir, 'page'),
+    iconCacheDir: cacheDir,
+    fetchIcon,
+  });
+}
+
+/** One raw request that keeps the body as bytes. */
+function sendBytes(path: string, on: UiServer): Promise<{ status: number; type: string | undefined; body: Buffer }> {
+  return new Promise((done, fail) => {
+    const req = request({ host: '127.0.0.1', port: on.port, path, headers: { Host: `127.0.0.1:${on.port}` } }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => done({ status: res.statusCode ?? 0, type: res.headers['content-type'], body: Buffer.concat(chunks) }));
+    });
+    req.on('error', fail);
+    req.end();
+  });
+}
+
+test('an icon is fetched from the wiki on first use, then served from the cache with no second fetch', async () => {
+  const wiki = fakeWiki({ [WHIP_URL]: { body: PNG } });
+  const icons = await iconServer(join(dir, 'icons-first-use'), wiki.fetchIcon);
+  try {
+    const first = await sendBytes(`/api/icon?id=${WHIP}`, icons);
+    const second = await sendBytes(`/api/icon?id=${WHIP}`, icons);
+
+    assert.equal(first.status, 200);
+    assert.equal(first.type, 'image/png');
+    assert.deepEqual(first.body, PNG);
+    assert.deepEqual(second.body, PNG);
+    assert.deepEqual(wiki.calls.map((c) => c.url), [WHIP_URL]);
+  } finally {
+    await icons.close();
+  }
+});
+
+test('the icon request carries the file name and a generic User-Agent, and no personal data', async () => {
+  const wiki = fakeWiki({ [WHIP_URL]: { body: PNG } });
+  const icons = await iconServer(join(dir, 'icons-privacy'), wiki.fetchIcon);
+  try {
+    await sendBytes(`/api/icon?id=${WHIP}`, icons);
+
+    const [call] = wiki.calls;
+    assert.equal(call.url, WHIP_URL, 'no query string, no other host');
+    assert.deepEqual(Object.keys(call.headers), ['user-agent']);
+    assert.match(call.headers['user-agent'], /^osrs-pvm-coach\b/);
+    assert.ok(!/FixtureIron|@|https?:/i.test(call.headers['user-agent']), call.headers['user-agent']);
+  } finally {
+    await icons.close();
+  }
+});
+
+test('a missing or unusable icon answers 404, so the page shows the item name', async () => {
+  const cacheDir = join(dir, 'icons-missing');
+  const tooBig = Buffer.concat([PNG, Buffer.alloc(70 * 1024)]);
+  const wiki = fakeWiki({
+    [WHIP_URL]: { type: 'text/html', body: Buffer.from('<html>') },
+    'https://oldschool.runescape.wiki/images/Fire_cape.png': { body: tooBig },
+  });
+  const icons = await iconServer(cacheDir, wiki.fetchIcon);
+  try {
+    assert.equal((await sendBytes(`/api/icon?id=${WHIP}`, icons)).status, 404, 'not a PNG');
+    assert.equal((await sendBytes('/api/icon?id=6570', icons)).status, 404, 'too big for an icon');
+    assert.equal((await sendBytes('/api/icon?id=11840', icons)).status, 404, 'the wiki has no file');
+    assert.equal((await sendBytes('/api/icon?id=999999999', icons)).status, 404, 'no such item');
+    assert.equal((await sendBytes('/api/icon?id=../../x', icons)).status, 400, 'not an item id');
+  } finally {
+    await icons.close();
+  }
+
+  const again = await iconServer(cacheDir, fakeWiki({ [WHIP_URL]: { body: PNG } }).fetchIcon);
+  try {
+    assert.equal((await sendBytes(`/api/icon?id=${WHIP}`, again)).status, 200, 'a bad reply was not cached');
+  } finally {
+    await again.close();
+  }
+});
+
+test('an icon that failed for lack of network comes back when the network does, with no restart', async () => {
+  const net = { offline: true };
+  const icons = await iconServer(join(dir, 'icons-network-back'), fakeWiki({ [WHIP_URL]: { body: PNG } }, net).fetchIcon);
+  try {
+    assert.equal((await sendBytes(`/api/icon?id=${WHIP}`, icons)).status, 404, 'no network');
+    net.offline = false;
+
+    const reply = await sendBytes(`/api/icon?id=${WHIP}`, icons);
+
+    assert.equal(reply.status, 200);
+    assert.deepEqual(reply.body, PNG);
+  } finally {
+    await icons.close();
+  }
+});
+
+test('with no network, a restarted server still serves the cached icon', async () => {
+  const cacheDir = join(dir, 'icons-offline');
+  const online = await iconServer(cacheDir, fakeWiki({ [WHIP_URL]: { body: PNG } }).fetchIcon);
+  await sendBytes(`/api/icon?id=${WHIP}`, online);
+  await online.close();
+
+  const offlineWiki = fakeWiki({ [WHIP_URL]: { body: PNG } }, { offline: true });
+  const offline = await iconServer(cacheDir, offlineWiki.fetchIcon);
+  try {
+    const reply = await sendBytes(`/api/icon?id=${WHIP}`, offline);
+
+    assert.equal(reply.status, 200);
+    assert.deepEqual(reply.body, PNG);
+    assert.equal(offlineWiki.calls.length, 0);
+    assert.equal((await sendBytes('/api/icon?id=11840', offline)).status, 404, 'an uncached icon with no network');
+  } finally {
+    await offline.close();
+  }
+});
+
+test('the state summary gives the worn item ids, for the icons', async () => {
+  // An earlier test swaps the fixture's weapon, so compare with the file as it is now.
+  const state = JSON.parse(await readFile(join(dir, 'fixture', 'state.json'), 'utf8'));
+  const summary = JSON.parse((await send('/api/state')).body);
+
+  assert.equal(summary.wornIds.weapon, state.equipment.weapon);
+  assert.equal(summary.wornIds.ammo, null);
 });
 
 test('the server binds 127.0.0.1 only: the LAN address refuses the connection', async (t) => {
