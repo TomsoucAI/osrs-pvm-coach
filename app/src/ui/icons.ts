@@ -21,27 +21,49 @@ export interface IconCache {
   get(itemId: number): Promise<Buffer | null>;
 }
 
-export function createIconCache(dir: string, fetchIcon: typeof fetch): IconCache {
-  // Icons that failed in this run. A restart tries them again; nothing bad is ever written to disk.
-  const failed = new Set<number>();
-  // One wiki request per icon, even when the page asks for it from both paperdolls at once.
-  const pending = new Map<number, Promise<Buffer | null>>();
+/** The body, or null as soon as it passes `MAX_ICON_BYTES`: a big reply never sits in memory. */
+async function readCapped(reply: Response): Promise<Buffer | null> {
+  if (Number(reply.headers.get('content-length') ?? 0) > MAX_ICON_BYTES || !reply.body) return null;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of reply.body) {
+    size += chunk.length;
+    if (size > MAX_ICON_BYTES) return null;
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
 
-  async function download(id: number, image: string): Promise<Buffer | null> {
+/** What one wiki request gave: an icon, a definite "no icon", or a failure to try again later. */
+type Download = { icon: Buffer } | 'no-icon' | 'retry';
+
+export function createIconCache(dir: string, fetchIcon: typeof fetch): IconCache {
+  // Icons the wiki answered "no" to in this run. A restart asks again. A network error or a 5xx is not kept,
+  // so the icon comes back as soon as the network does. Nothing bad is ever written to disk.
+  const noIcon = new Set<number>();
+  // One wiki request per icon, even when the page asks for it from both paperdolls at once.
+  const pending = new Map<number, Promise<Download>>();
+
+  async function download(id: number, image: string): Promise<Download> {
     const url = WIKI_IMAGES + encodeURIComponent(image.replaceAll(' ', '_'));
     try {
-      const reply = await fetchIcon(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-      if (!reply.ok || !reply.headers.get('content-type')?.startsWith('image/png')) return null;
-      const body = Buffer.from(await reply.arrayBuffer());
-      if (body.length > MAX_ICON_BYTES || !body.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return null;
+      // `redirect: 'error'`: the request never leaves the wiki host.
+      const reply = await fetchIcon(url, {
+        headers: { 'User-Agent': USER_AGENT }, redirect: 'error', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (reply.status >= 500) return 'retry';
+      if (!reply.ok || !reply.headers.get('content-type')?.startsWith('image/png')) return 'no-icon';
+      const body = await readCapped(reply);
+      if (!body || !body.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return 'no-icon';
       await mkdir(dir, { recursive: true });
       // Write, then rename: a crash never leaves half an icon in the cache.
       const file = join(dir, `${id}.png`);
       await writeFile(`${file}.tmp`, body);
       await rename(`${file}.tmp`, file);
-      return body;
+      return { icon: body };
     } catch {
-      return null;
+      // No network, a timeout, or a full disk: try again on the next request.
+      return 'retry';
     }
   }
 
@@ -51,17 +73,18 @@ export function createIconCache(dir: string, fetchIcon: typeof fetch): IconCache
       if (!item?.image) return null;
       const cached = await readFile(join(dir, `${item.id}.png`)).catch(() => null);
       if (cached) return cached;
-      if (failed.has(item.id)) return null;
+      if (noIcon.has(item.id)) return null;
       let job = pending.get(item.id);
       if (!job) {
-        job = download(item.id, item.image).then((icon) => {
-          if (!icon) failed.add(item.id);
+        job = download(item.id, item.image).then((result) => {
+          if (result === 'no-icon') noIcon.add(item.id);
           pending.delete(item.id);
-          return icon;
+          return result;
         });
         pending.set(item.id, job);
       }
-      return job;
+      const result = await job;
+      return typeof result === 'object' ? result.icon : null;
     },
   };
 }

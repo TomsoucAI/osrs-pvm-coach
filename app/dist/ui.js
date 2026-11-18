@@ -315488,23 +315488,39 @@ var USER_AGENT = "osrs-pvm-coach (local item icon cache)";
 var FETCH_TIMEOUT_MS = 5e3;
 var MAX_ICON_BYTES = 64 * 1024;
 var PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+async function readCapped(reply) {
+  if (Number(reply.headers.get("content-length") ?? 0) > MAX_ICON_BYTES || !reply.body) return null;
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of reply.body) {
+    size += chunk.length;
+    if (size > MAX_ICON_BYTES) return null;
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
 function createIconCache(dir, fetchIcon) {
-  const failed = /* @__PURE__ */ new Set();
+  const noIcon = /* @__PURE__ */ new Set();
   const pending = /* @__PURE__ */ new Map();
   async function download(id, image) {
     const url = WIKI_IMAGES + encodeURIComponent(image.replaceAll(" ", "_"));
     try {
-      const reply = await fetchIcon(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-      if (!reply.ok || !reply.headers.get("content-type")?.startsWith("image/png")) return null;
-      const body = Buffer.from(await reply.arrayBuffer());
-      if (body.length > MAX_ICON_BYTES || !body.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return null;
+      const reply = await fetchIcon(url, {
+        headers: { "User-Agent": USER_AGENT },
+        redirect: "error",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+      });
+      if (reply.status >= 500) return "retry";
+      if (!reply.ok || !reply.headers.get("content-type")?.startsWith("image/png")) return "no-icon";
+      const body = await readCapped(reply);
+      if (!body || !body.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return "no-icon";
       await mkdir(dir, { recursive: true });
       const file = join2(dir, `${id}.png`);
       await writeFile(`${file}.tmp`, body);
       await rename(`${file}.tmp`, file);
-      return body;
+      return { icon: body };
     } catch {
-      return null;
+      return "retry";
     }
   }
   return {
@@ -315513,17 +315529,18 @@ function createIconCache(dir, fetchIcon) {
       if (!item?.image) return null;
       const cached2 = await readFile2(join2(dir, `${item.id}.png`)).catch(() => null);
       if (cached2) return cached2;
-      if (failed.has(item.id)) return null;
+      if (noIcon.has(item.id)) return null;
       let job = pending.get(item.id);
       if (!job) {
-        job = download(item.id, item.image).then((icon) => {
-          if (!icon) failed.add(item.id);
+        job = download(item.id, item.image).then((result2) => {
+          if (result2 === "no-icon") noIcon.add(item.id);
           pending.delete(item.id);
-          return icon;
+          return result2;
         });
         pending.set(item.id, job);
       }
-      return job;
+      const result = await job;
+      return typeof result === "object" ? result.icon : null;
     }
   };
 }
@@ -315673,7 +315690,7 @@ async function startUiServer(options) {
         if (!/^\d{1,9}$/.test(id)) throw new HttpError(400, 'The "id" parameter is an item id.');
         const icon = await icons.get(Number(id));
         if (!icon) throw new HttpError(404, "No icon for this item.");
-        res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "max-age=86400" });
+        res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "private, max-age=86400" });
         return res.end(icon);
       }
       case "/api/events":

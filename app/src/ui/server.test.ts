@@ -276,12 +276,12 @@ const WHIP = 4151;
 
 interface WikiCall { url: string; headers: Record<string, string> }
 
-/** A fake wiki: answers each URL from `files`, records each call, and fails like a lost network when `offline`. */
-function fakeWiki(files: Record<string, { status?: number; type?: string; body: Buffer }>, opts: { offline?: boolean } = {}) {
+/** A fake wiki: answers each URL from `files`, records each call, and fails like a lost network while `net.offline`. */
+function fakeWiki(files: Record<string, { status?: number; type?: string; body: Buffer }>, net: { offline?: boolean } = {}) {
   const calls: WikiCall[] = [];
   const fetchIcon = (async (input: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(input), headers: Object.fromEntries(new Headers(init?.headers).entries()) });
-    if (opts.offline) throw new TypeError('fetch failed');
+    if (net.offline) throw new TypeError('fetch failed');
     const file = files[String(input)];
     if (!file) return new Response('no such file', { status: 404 });
     return new Response(new Uint8Array(file.body), { status: file.status ?? 200, headers: { 'Content-Type': file.type ?? 'image/png' } });
@@ -349,22 +349,42 @@ test('the icon request carries the file name and a generic User-Agent, and no pe
 });
 
 test('a missing or unusable icon answers 404, so the page shows the item name', async () => {
-  const wiki = fakeWiki({ [WHIP_URL]: { type: 'text/html', body: Buffer.from('<html>') } });
-  const icons = await iconServer(join(dir, 'icons-missing'), wiki.fetchIcon);
+  const cacheDir = join(dir, 'icons-missing');
+  const tooBig = Buffer.concat([PNG, Buffer.alloc(70 * 1024)]);
+  const wiki = fakeWiki({
+    [WHIP_URL]: { type: 'text/html', body: Buffer.from('<html>') },
+    'https://oldschool.runescape.wiki/images/Fire_cape.png': { body: tooBig },
+  });
+  const icons = await iconServer(cacheDir, wiki.fetchIcon);
   try {
     assert.equal((await sendBytes(`/api/icon?id=${WHIP}`, icons)).status, 404, 'not a PNG');
+    assert.equal((await sendBytes('/api/icon?id=6570', icons)).status, 404, 'too big for an icon');
     assert.equal((await sendBytes('/api/icon?id=11840', icons)).status, 404, 'the wiki has no file');
     assert.equal((await sendBytes('/api/icon?id=999999999', icons)).status, 404, 'no such item');
     assert.equal((await sendBytes('/api/icon?id=../../x', icons)).status, 400, 'not an item id');
-
+  } finally {
     await icons.close();
-    const fixed = fakeWiki({ [WHIP_URL]: { body: PNG } });
-    const again = await iconServer(join(dir, 'icons-missing'), fixed.fetchIcon);
-    try {
-      assert.equal((await sendBytes(`/api/icon?id=${WHIP}`, again)).status, 200, 'a bad reply was not cached');
-    } finally {
-      await again.close();
-    }
+  }
+
+  const again = await iconServer(cacheDir, fakeWiki({ [WHIP_URL]: { body: PNG } }).fetchIcon);
+  try {
+    assert.equal((await sendBytes(`/api/icon?id=${WHIP}`, again)).status, 200, 'a bad reply was not cached');
+  } finally {
+    await again.close();
+  }
+});
+
+test('an icon that failed for lack of network comes back when the network does, with no restart', async () => {
+  const net = { offline: true };
+  const icons = await iconServer(join(dir, 'icons-network-back'), fakeWiki({ [WHIP_URL]: { body: PNG } }, net).fetchIcon);
+  try {
+    assert.equal((await sendBytes(`/api/icon?id=${WHIP}`, icons)).status, 404, 'no network');
+    net.offline = false;
+
+    const reply = await sendBytes(`/api/icon?id=${WHIP}`, icons);
+
+    assert.equal(reply.status, 200);
+    assert.deepEqual(reply.body, PNG);
   } finally {
     await icons.close();
   }
@@ -376,7 +396,7 @@ test('with no network, a restarted server still serves the cached icon', async (
   await sendBytes(`/api/icon?id=${WHIP}`, online);
   await online.close();
 
-  const offlineWiki = fakeWiki({}, { offline: true });
+  const offlineWiki = fakeWiki({ [WHIP_URL]: { body: PNG } }, { offline: true });
   const offline = await iconServer(cacheDir, offlineWiki.fetchIcon);
   try {
     const reply = await sendBytes(`/api/icon?id=${WHIP}`, offline);

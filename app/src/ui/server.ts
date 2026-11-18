@@ -192,7 +192,7 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
         const icon = await icons.get(Number(id));
         if (!icon) throw new HttpError(404, 'No icon for this item.');
         // Icons do not change: the browser may keep them (the other replies stay no-store).
-        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' });
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=86400' });
         return res.end(icon);
       }
       case '/api/events':
