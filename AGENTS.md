@@ -9,7 +9,7 @@ The plugin reads game state and writes local files. The app reads those files an
 2. **No modified client.** Run the official RuneLite client or its developer client (`gradlew run`). Never an injected, patched or third-party client.
 3. **No HTTP from the plugin.** The plugin opens no socket and no server, and calls no URL. Its only output is files under `~/.runelite/plugin-data/dps_bridge/`.
 4. **No in-fight prayer, attack or position prompts.** Nothing tells the player what to pray, what to attack or where to stand during a fight. The allowed output is planning: gear, DPS, a defence number.
-5. **No Computer Use.** No agent reads the screen or drives the game window, keyboard or mouse.
+5. **No Computer Use.** No agent reads the screen or drives the game window, keyboard or mouse. Agents get game data from the plugin's files and the MCP tools only.
 <!-- /never-list -->
 
 ## Agent skills

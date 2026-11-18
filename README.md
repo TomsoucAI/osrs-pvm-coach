@@ -12,11 +12,11 @@ Two front ends share that core: an MCP server for Claude (Code or Desktop) and a
 
 ```mermaid
 flowchart LR
-    subgraph PC["Your PC (nothing below leaves it)"]
+    subgraph PC["Your PC (our code makes no internet requests)"]
         RL["RuneLite client"]
         PL["plugin/<br/>DPS Bridge (read-only)"]
         F[("state.json + bank.json<br/>~/.runelite/plugin-data/dps_bridge/")]
-        CORE["app/src/core<br/>readState + planBankMode<br/>Wiki DPS engine"]
+        CORE["app/src/core + snapshot.ts<br/>readState, getSnapshot, planBankMode<br/>Wiki DPS engine"]
         MCP["app/dist/index.js<br/>MCP server (stdio)"]
         UI["app/dist/ui.js<br/>UI server 127.0.0.1:4780"]
         WS["WikiSync plugin<br/>(fallback)"]
@@ -38,7 +38,8 @@ flowchart LR
 | Folder | What it is | Language |
 |---|---|---|
 | `plugin/` | DPS Bridge RuneLite plugin. Reads game state, writes the two JSON files. No other output. | Java 11 (build with JDK 21) |
-| `app/src/core/` | One shared core: reads the files (`liveState.ts`) and ranks owned setups (`bankMode.ts`) | TypeScript |
+| `app/src/core/` | Shared core: reads both files (`liveState.ts`) and ranks owned setups (`bankMode.ts`) | TypeScript |
+| `app/src/snapshot.ts`, `app/src/calc.ts` | State reader for the first four MCP tools (with the WikiSync fallback), and the engine wrapper | TypeScript |
 | `app/src/index.ts` | `mcp` entry point: the MCP tools below | TypeScript |
 | `app/src/ui.ts`, `app/src/ui/`, `app/page/` | `ui` entry point: HTTP server and the React page | TypeScript |
 | `app/dist/` | Built, self-contained bundles. Committed, so users run them with no `npm install` | JavaScript |
@@ -73,7 +74,7 @@ The plugin reads game state and writes local files. The app reads those files an
 2. **No modified client.** Run the official RuneLite client or its developer client (`gradlew run`). Never an injected, patched or third-party client.
 3. **No HTTP from the plugin.** The plugin opens no socket and no server, and calls no URL. Its only output is files under `~/.runelite/plugin-data/dps_bridge/`.
 4. **No in-fight prayer, attack or position prompts.** Nothing tells the player what to pray, what to attack or where to stand during a fight. The allowed output is planning: gear, DPS, a defence number.
-5. **No Computer Use.** No agent reads the screen or drives the game window, keyboard or mouse.
+5. **No Computer Use.** No agent reads the screen or drives the game window, keyboard or mouse. Agents get game data from the plugin's files and the MCP tools only.
 <!-- /never-list -->
 
 Two layers enforce the rules, because legality is about what a feature *does*, and code patterns only catch the obvious cases:
@@ -81,13 +82,13 @@ Two layers enforce the rules, because legality is about what a feature *does*, a
 | Layer | When | What |
 |---|---|---|
 | Maintainer verdict (`osrs-legality-gate` skill) | Before any new or changed plugin feature, recorded on the issue | GREEN / AMBER / RED verdict against RuneLite's official rules and Plugin Hub precedent. RED features are refused |
-| [`plugin/tools/legal-lint.mjs`](plugin/tools/legal-lint.mjs) | After every edit (Claude Code hook, with Claude Code opened at the repo root), in CI on every PR, or `node tools/legal-lint.mjs` in `plugin/` | RED: forbidden code (input injection, menu actions, autotype, reflection, servers…) blocks the edit. AMBER: risky APIs (projectiles, prayer tab, NPC targeting, sounds…) need a `// legal-gate: GREEN <reason>` line |
+| [`plugin/tools/legal-lint.mjs`](plugin/tools/legal-lint.mjs) | After every edit (Claude Code hook, with Claude Code opened at the repo root), in CI on every PR, or `node tools/legal-lint.mjs` in `plugin/` | RED: forbidden code (input injection, menu actions, autotype, reflection, servers…). The hook reports it to Claude after the edit; CI fails the PR. AMBER: risky APIs (projectiles, prayer tab, NPC targeting, sounds…) need a `// legal-gate: GREEN <reason>` line |
 
 [`plugin/AGENTS.md`](plugin/AGENTS.md) is RuneLite's official agent guide (copied from `runelite/example-plugin`, imported by `plugin/CLAUDE.md`): Java 11, Filepath for file I/O, combat restrictions. No tool guarantees anything: the Plugin Hub review is the strongest check there is. If a feature wouldn't pass it, don't run it locally either.
 
 ### Account safety
 
-- Nothing here asks for, reads or stores your password. The MCP and the UI server make no internet requests; they read local files (the MCP also WikiSync on localhost).
+- Nothing here asks for, reads or stores your password. The MCP and the UI server make no internet requests. They read local files, and the MCP also reads WikiSync on localhost. Claude gets the answers that the MCP returns.
 - Dev client login goes through Jagex's own login window. The session is stored encrypted in `~/.runelite/jagex-accounts.dat`; the key is in Windows Credential Manager. No password is stored.
 - If you ever created `~/.runelite/credentials.properties` (old login method), delete it.
 - The repo-root `.claude/settings.json` denies Claude Code's `Read` and `Edit` of `credentials.properties` and `jagex-accounts.dat`. This also blocks Bash commands that name the file (`cat`, `head`, redirections). **Residual risk:** it does not block a command that reads the file without naming it (`grep -r`) or a subprocess (`node -e`, `sh -c`). Only the Claude Code sandbox closes that gap, and it does not run on native Windows (WSL2 only). A read gives an encrypted session, not your password. Accepted for now; see #30.
@@ -207,14 +208,13 @@ Checks to run locally (in `app/`, after `npm ci` and `npm run setup`):
 | Strict type-check of our code | `npx tsc -p .` (errors listed under `../vendor/` are the Wiki calc's own, unchanged) |
 | Interactive explorer | `npx @modelcontextprotocol/inspector node dist/index.js` |
 | Pull the latest engine + data and rebuild | `npm run update-calc` |
-| LLM evaluation (10 questions, needs `ANTHROPIC_API_KEY`) | `cd ../evals && pip install -r requirements.txt && python evaluation.py evaluation.xml -t stdio -c node -a ../app/dist/index.js -e DPS_BRIDGE_FILE=../examples/state.sample.json` |
+| LLM evaluation (optional: 10 questions, needs Python 3 and `ANTHROPIC_API_KEY`) | `cd ../evals; pip install -r requirements.txt; python evaluation.py evaluation.xml -t stdio -c node -a ../app/dist/index.js -e DPS_BRIDGE_FILE=../examples/state.sample.json` |
 
 Plugin checks (in `plugin/`): `.\gradlew.bat build` and `node tools/legal-lint.mjs` (no RED).
 
 ## Licences
 
 - `app/` (MCP server, UI server, page): GPL-3.0, see [`app/LICENSE`](app/LICENSE). It bundles the calculator engine (weirdgloop/osrs-dps-calc), which is GPL-3.0, so the bundled `dist/` is GPL-3.0 too.
-- `plugin/` (RuneLite plugin): BSD-2, see [`plugin/LICENSE`](plugin/LICENSE), as the Plugin Hub requires.
-- A contribution is released under the licence of the folder it changes.
+- `plugin/` (RuneLite plugin): BSD-2, see [`plugin/LICENSE`](plugin/LICENSE). The Plugin Hub requires a permissive licence.
 
 Credits: DPS maths from the [OSRS Wiki DPS calculator](https://github.com/weirdgloop/osrs-dps-calc). Built on [RuneLite](https://github.com/runelite/runelite). Fallback data: WikiSync. Not affiliated with Jagex, RuneLite or the OSRS Wiki.
