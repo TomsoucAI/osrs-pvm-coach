@@ -2,3 +2,4 @@
 // Run with: npm run build && node --test dist/core.test.js
 import './core/liveState.test';
 import './core/bankMode.test';
+import './core/bankModeBoosts.test';

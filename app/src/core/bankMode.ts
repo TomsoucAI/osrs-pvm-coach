@@ -24,17 +24,20 @@ import {
 import { CAST_STANCES } from '@/lib/constants';
 import { getCombatStylesForCategory } from '@/utils';
 import { EquipmentCategory } from '@/enums/EquipmentCategory';
+import Potion from '@/enums/Potion';
+import { Prayer, PrayerMap } from '@/enums/Prayer';
 import UserIssueType from '@/enums/UserIssueType';
 import { spells, type Spell } from '@/types/Spell';
 import type { EquipmentPiece, Player, PlayerEquipment } from '@/types/Player';
 import type { Monster } from '@/types/Monster';
 import type { PlayerCombatStyle } from '@/types/PlayerCombatStyle';
 import {
-  buildPlayer, calculate, findItem, resolveMonsterWithDrains, SLOTS, type DefenceReductions,
+  buildPlayer, calculate, defenceAfterReductions, findItem, resolveMonsterWithDrains, SLOTS, type DefenceReductions,
 } from '../calc';
 import engineNamedItems from './engineNamedItems.json';
 import type { ItemStack, LiveState } from './liveState';
 import { phaseUnavailable, type CombatStyle } from './phaseRules';
+import { bestOwnedPotions, bestPrayers } from './plannedBoosts';
 
 export type Slot = keyof PlayerEquipment;
 export type ItemSource = 'worn' | 'inventory' | 'bank';
@@ -54,18 +57,44 @@ export interface Setup {
   /** The slots to change from what is worn now. */
   swaps: Swap[];
 }
-export type StylePlan = { setups: Setup[] } | { unavailable: string };
+/** `planned` = the best unlocked prayer and the best owned potion of the style. `live` = levels and prayers as they are now. */
+export type BoostMode = 'planned' | 'live';
+/** What Planned mode assumed for one combat style. */
+export interface AssumedBoosts {
+  prayers: string[];
+  /** The potions to bring, each with the doses owned in the inventory and the bank. Empty = no owned potion helps this style. */
+  potions: { name: string; doses: number }[];
+}
+/** The best setup of the style within a number of slot changes from what is worn. null = no setup can attack within that number. */
+export interface Tiers {
+  bestOwned: Setup;
+  upToTwoSwaps: Setup | null;
+  /** The worn gear as it is, with the best combat style (and spell) its weapon has for this style. */
+  wearingNow: Setup | null;
+}
+export type StylePlan = {
+  setups: Setup[];
+  tiers: Tiers;
+  /** null in Live mode. */
+  assumed: AssumedBoosts | null;
+} | { unavailable: string };
 
 export interface BankModeRequest {
   monster: { name: string; version?: string } | { id: number };
   /** Omitted = all three combat styles. */
   style?: CombatStyle;
+  boosts: BoostMode;
+  /** Prayer names that Planned mode can assume, e.g. ["Piety", "Rigour"]. Omitted = every prayer. */
+  unlockedPrayers?: string[];
   /** Omitted = the drains that the plugin counted on this monster. A value replaces them. */
   drains?: DefenceReductions;
 }
 
 export interface BankModePlan {
   monster: { id: number; name: string; version: string };
+  /** The monster's Defence level: `base` before the drains of the request, `effective` after them (boss floors applied). */
+  defence: { base: number; effective: number };
+  boosts: BoostMode;
   styles: Partial<Record<CombatStyle, StylePlan>>;
   /** Age of the bank snapshot, or null when there is none. */
   bankAgeMs: number | null;
@@ -74,6 +103,7 @@ export interface BankModePlan {
 
 const COMBAT_STYLES: CombatStyle[] = ['melee', 'ranged', 'magic'];
 const SETUPS_PER_STYLE = 3;
+const TIER_SWAPS = 2;
 const OTHER_SLOTS = SLOTS.filter((s) => s !== 'weapon');
 const ENGINE_NAMED = new Set<string>(engineNamedItems);
 // A setup with one of these engine issues cannot attack as planned.
@@ -351,8 +381,9 @@ class TopSetups {
 /**
  * Searches every setup of one attack and offers each one that can enter `top`. Branch and bound:
  * the slots not chosen yet hold an upper-bound item, so one engine call bounds a whole branch.
+ * `maxSwaps` = the most slots a setup can change from what is worn: a branch that is already over it is skipped.
  */
-function searchAttack(template: Player, attack: Attack, pool: Record<Slot, Owned[]>, worn: Gear, monster: Monster, top: TopSetups) {
+function searchAttack(template: Player, attack: Attack, pool: Record<Slot, Owned[]>, worn: Gear, monster: Monster, top: TopSetups, maxSwaps: number) {
   const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
   if (slots.some((items) => items.plain.length === 0)) return;
   const effective = effectiveNamed(template, attack, slots, monster);
@@ -377,6 +408,8 @@ function searchAttack(template: Player, attack: Attack, pool: Record<Slot, Owned
     return searchDps(template, attack, bounded, monster);
   };
   const chooseOnStats = (open: number[], from: number) => {
+    const notChosen = new Set<Slot>(open.slice(from).map((i) => OTHER_SLOTS[i]));
+    if (SLOTS.filter((s) => !notChosen.has(s) && gear[s] !== worn[s]).length > maxSwaps) return;
     const dps = bound(open, from);
     if (dps <= 0 || round3(dps) < top.floor()) return;
     if (from === open.length) {
@@ -405,9 +438,12 @@ function searchAttack(template: Player, attack: Attack, pool: Record<Slot, Owned
   chooseExact(0, []);
 }
 
-function rankStyle(template: Player, combat: CombatStyle, pool: Record<Slot, Owned[]>, worn: Gear, spellbook: LiveState['spellbook'], monster: Monster): Candidate[] {
+function rankStyle(
+  template: Player, combat: CombatStyle, pool: Record<Slot, Owned[]>, worn: Gear, spellbook: LiveState['spellbook'], monster: Monster,
+  maxSwaps = Infinity,
+): Candidate[] {
   const top = new TopSetups();
-  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top);
+  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top, maxSwaps);
   return top.ranked();
 }
 
@@ -442,7 +478,7 @@ export function planBankMode(state: LiveState, request: BankModeRequest): BankMo
   } = collectOwned(state);
   const empty = Object.fromEntries(SLOTS.map((s) => [s, null])) as Record<Slot, null>;
   // Live boosts: levels, prayers and buffs as they are now. Gear, style and spell come from the search.
-  const template = buildPlayer(state, monster, { equipment: empty }).player;
+  const live = buildPlayer(state, monster, { equipment: empty }).player;
 
   const wanted = request.style ? [request.style] : COMBAT_STYLES;
   const styles: BankModePlan['styles'] = {};
@@ -452,10 +488,38 @@ export function planBankMode(state: LiveState, request: BankModeRequest): BankMo
       styles[combat] = { unavailable };
       continue;
     }
-    const ranked = withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster));
-    styles[combat] = ranked.length
-      ? { setups: ranked.map((c) => describe(template, c, worn, monster)).sort((a, b) => b.dps - a.dps) }
-      : { unavailable: `No owned setup can attack with ${combat}.` };
+    let template = live;
+    let assumed: AssumedBoosts | null = null;
+    if (request.boosts === 'planned') {
+      const prayers = bestPrayers(combat, request.unlockedPrayers);
+      const potions = bestOwnedPotions(combat, live.skills, [...state.inventory, ...(state.bank?.items ?? [])]);
+      // Planned boosts replace the live ones: base levels with these potions, and these prayers only.
+      template = buildPlayer(state, monster, {
+        equipment: empty,
+        prayers: prayers.map((p) => Prayer[p]),
+        potions: potions.flatMap((p) => p.engine.map((e) => Potion[e])),
+      }).player;
+      assumed = {
+        prayers: prayers.map((p) => PrayerMap[p].name),
+        potions: potions.map(({ name, doses }) => ({ name, doses })),
+      };
+    }
+    const rank = (maxSwaps?: number) => withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster, maxSwaps));
+    const ranked = rank();
+    if (!ranked.length) {
+      styles[combat] = { unavailable: `No owned setup can attack with ${combat}.` };
+      continue;
+    }
+    const setups = ranked.map((c) => describe(template, c, worn, monster)).sort((a, b) => b.dps - a.dps);
+    // The best setup has the fewest swaps of all setups with its DPS: when it fits a tier, it is that tier's answer.
+    const within = (maxSwaps: number): Setup | null => {
+      if (setups[0].swaps.length <= maxSwaps) return setups[0];
+      const [best] = rank(maxSwaps);
+      return best ? describe(template, best, worn, monster) : null;
+    };
+    styles[combat] = {
+      setups, assumed, tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS), wearingNow: within(0) },
+    };
   }
 
   const notes = [...unknownWorn, ...drainNotes];
@@ -475,6 +539,8 @@ export function planBankMode(state: LiveState, request: BankModeRequest): BankMo
   }
   return {
     monster: { id: monster.id, name: monster.name, version: monster.version ?? '' },
+    defence: defenceAfterReductions(monster),
+    boosts: request.boosts,
     styles,
     bankAgeMs: state.bank?.ageMs ?? null,
     notes,

@@ -18,7 +18,7 @@ test('a v2 state file and its bank file give worn, inventory, bank, rune pouch a
   assert.deepEqual(state.inventory[0], { id: 13576, quantity: 1 });
   assert.equal(state.spellbook, 'standard');
   assert.deepEqual(state.runePouch[0], { runeItemId: 554, quantity: 5000 });
-  assert.equal(state.bank?.items.length, 29);
+  assert.equal(state.bank?.items.length, 33);
   assert.equal(state.bank?.ageMs, 7_200_000);
 });
 
