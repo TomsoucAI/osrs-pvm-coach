@@ -1,6 +1,5 @@
 /* The shell's look: the stone window, its title bar and the three tabs. Spacing, type and colours come from tokens.css;
-   only the bevel gradients are local.
-   The Gear tab keeps its own look until its reskin (ticket 2 of spec #72). */
+   only the bevel gradients are local. */
 html:has(.shell) body { background: var(--os-backdrop); }
 
 .shell {

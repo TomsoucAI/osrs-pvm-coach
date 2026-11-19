@@ -11,6 +11,7 @@
   /* Surfaces: the stone window and its bevels. */
   --os-backdrop: #0c0a07; --os-bg: #3e3529; --os-inset: #2b2419; --os-stone: #4d453a;
   --os-edge-hi: #6b6253; --os-edge-lo: #17140f; --os-edge-black: #0b0a08;
+  --os-well: #231d14; --os-field: #14110c;
 
   /* Colour jobs: white body, tan labels, orange headings, yellow the name and the selection. */
   --os-white: #ffffff; --os-tan: #b9aa8a; --os-orange: #ff981f; --os-yellow: #ffff00; --os-credit: #8f836c;
