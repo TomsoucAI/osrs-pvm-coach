@@ -84,9 +84,6 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .tier-label { font-weight: 700; }
 .tier-dps { font-weight: 700; color: var(--gold); grid-row: span 2; align-self: center; font-size: 16px; }
 
-.credit { margin-top: 16px; font-size: 11px; text-align: center; }
-.credit a { color: inherit; }
-
 /* Offline: the last known data stays on screen, greyed, so stale numbers are not trusted by mistake. */
 .offline .data { filter: grayscale(1); opacity: .45; }
 

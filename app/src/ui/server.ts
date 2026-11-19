@@ -61,6 +61,7 @@ const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
+  '.ttf': 'font/ttf',
 };
 /** Windows fires 2 or 3 change events for one save. */
 const CHANGE_DEBOUNCE_MS = 100;

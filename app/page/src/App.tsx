@@ -418,10 +418,6 @@ export function App() {
           )}
         </aside>
       </div>
-      <footer className="muted credit">
-        Item icons © Jagex Ltd., from the <a href="https://oldschool.runescape.wiki/" rel="noreferrer" target="_blank">Old School RuneScape Wiki</a>.
-        Not affiliated with or endorsed by Jagex.
-      </footer>
     </div>
   );
 }
