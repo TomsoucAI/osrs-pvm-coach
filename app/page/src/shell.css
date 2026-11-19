@@ -4,19 +4,21 @@
 html:has(.shell) body { background: var(--os-backdrop); }
 
 .shell {
-  max-width: 1400px; margin: var(--space-2) auto; background: var(--os-bg); color: var(--os-white);
+  max-width: 1400px; margin: var(--space-2) auto; background: var(--os-bg);
   border: 2px solid var(--os-edge-black); border-radius: 3px;
   box-shadow: 0 0 0 2px var(--os-stone), 0 0 0 3px var(--os-edge-black), inset 0 0 0 1px var(--os-edge-hi);
 }
 .shell-title, .shell-foot, .shell-panel {
-  font-family: var(--font-plain); font-size: var(--text-body); line-height: 1.5; text-shadow: 1px 1px 0 #000;
+  font-family: var(--font-plain); font-size: var(--text-body); line-height: 1.5; color: var(--os-white); text-shadow: var(--os-text-shadow);
 }
 
-/* Fixed positions: the title bar never wraps, so the tabs sit at the same x on every tab. */
+/* Fixed positions: the title bar holds the same content on every tab, so the tabs sit at the same place on every tab.
+   On a narrow window the tabs wrap under the title, the same way on every tab. */
 .shell-title {
-  display: flex; align-items: flex-end; gap: var(--space-2); padding: var(--space-1) var(--space-2) 0; flex-wrap: nowrap;
+  display: flex; align-items: flex-end; gap: 0 var(--space-2); padding: var(--space-1) var(--space-2) 0; flex-wrap: wrap;
   background: linear-gradient(#4a4033, #362e23); border-bottom: 2px solid var(--os-edge-black); box-shadow: 0 1px 0 var(--os-edge-hi);
 }
+/* The app title takes the top step of the type scale (32px), the pixel font's other sharp size. */
 .shell-title h1 {
   margin: 0 0 var(--space-1); font-family: var(--font-bold); font-weight: 400; font-size: var(--text-phase); line-height: 1;
   color: var(--os-orange); white-space: nowrap;

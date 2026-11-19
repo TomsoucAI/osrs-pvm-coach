@@ -62,17 +62,20 @@ export function Shell() {
       <header className="shell-title">
         <h1>PvM Coach</h1>
         <nav className="shell-tabs" aria-label="Sections">
-          {TABS.map((t) => (
-            <a
-              key={t.key}
-              className={`shell-tab ${t.key === tab ? 'on' : ''}`}
-              href={tabHref(t.key)}
-              aria-current={t.key === tab ? 'page' : undefined}
-              onClick={(e) => go(e, t.key)}
-            >
-              {t.label}
-            </a>
-          ))}
+          {TABS.map((t) => {
+            const on = t.key === tab;
+            return (
+              <a
+                key={t.key}
+                className={`shell-tab ${on ? 'on' : ''}`}
+                href={tabHref(t.key)}
+                aria-current={on ? 'page' : undefined}
+                onClick={(e) => go(e, t.key)}
+              >
+                {t.label}
+              </a>
+            );
+          })}
         </nav>
       </header>
       <div className="shell-body">{body}</div>
