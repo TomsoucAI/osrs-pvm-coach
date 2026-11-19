@@ -1,0 +1,26 @@
+/* The game's look, set once for every tab (spec #72, from prototype commit d976b26).
+   Fonts: github.com/RuneStar/fonts release 1.103-0. The repo is CC0, the glyphs are Jagex's: same accepted risk as the item icons. */
+@font-face { font-family: "RuneScape Plain 12"; src: url("/fonts/RuneScape-Plain-12.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "RuneScape Bold 12"; src: url("/fonts/RuneScape-Bold-12.ttf") format("truetype"); font-display: swap; }
+
+:root {
+  /* Fonts. A pixel font is sharp only at 16px and at whole multiples of it. */
+  --font-plain: "RuneScape Plain 12", "Trebuchet MS", Verdana, sans-serif;
+  --font-bold: "RuneScape Bold 12", "Trebuchet MS", Verdana, sans-serif;
+
+  /* Surfaces: the stone window and its bevels. */
+  --os-backdrop: #0c0a07; --os-bg: #3e3529; --os-inset: #2b2419; --os-stone: #4d453a;
+  --os-edge-hi: #6b6253; --os-edge-lo: #17140f; --os-edge-black: #0b0a08;
+
+  /* Colour jobs: white body, tan labels, orange headings, yellow the name and the selection. */
+  --os-white: #ffffff; --os-tan: #b9aa8a; --os-orange: #ff981f; --os-yellow: #ffff00; --os-credit: #8f836c;
+
+  /* Combat style, a hard rule on every tab: melee red, ranged green, magic blue. */
+  --os-melee: #ff4a3d; --os-ranged: #3fd13f; --os-magic: #5aa8ff;
+
+  /* Spacing: multiples of 8px only. */
+  --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 32px;
+
+  /* Type scale, four steps. */
+  --text-body: 16px; --text-do: 20px; --text-mechanic: 24px; --text-phase: 32px;
+}

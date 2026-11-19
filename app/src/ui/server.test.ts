@@ -278,6 +278,21 @@ test('static files come from the page folder only', async () => {
   }
 });
 
+test('the built page serves the RuneScape fonts from its own folder, with a font content type', async () => {
+  const built = await startUiServer({
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: resolve('dist', 'page'), iconCacheDir: join(dir, 'icons'),
+  });
+  try {
+    for (const font of ['RuneScape-Plain-12.ttf', 'RuneScape-Bold-12.ttf']) {
+      const reply = await send(`/fonts/${font}`, { on: built });
+      assert.equal(reply.status, 200, font);
+      assert.equal(reply.headers['content-type'], 'font/ttf', font);
+    }
+  } finally {
+    await built.close();
+  }
+});
+
 test('every reply carries the security headers and no CORS header', async () => {
   const replies = [
     await send('/'),

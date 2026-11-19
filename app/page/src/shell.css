@@ -1,0 +1,45 @@
+/* The shell's look: the stone window, its title bar and the three tabs. Spacing, type and colours come from tokens.css;
+   only the bevel gradients are local.
+   The Gear tab keeps its own look until its reskin (ticket 2 of spec #72). */
+html:has(.shell) body { background: var(--os-backdrop); }
+
+.shell {
+  max-width: 1400px; margin: var(--space-2) auto; background: var(--os-bg); color: var(--os-white);
+  border: 2px solid var(--os-edge-black); border-radius: 3px;
+  box-shadow: 0 0 0 2px var(--os-stone), 0 0 0 3px var(--os-edge-black), inset 0 0 0 1px var(--os-edge-hi);
+}
+.shell-title, .shell-foot, .shell-panel {
+  font-family: var(--font-plain); font-size: var(--text-body); line-height: 1.5; text-shadow: 1px 1px 0 #000;
+}
+
+/* Fixed positions: the title bar never wraps, so the tabs sit at the same x on every tab. */
+.shell-title {
+  display: flex; align-items: flex-end; gap: var(--space-2); padding: var(--space-1) var(--space-2) 0; flex-wrap: nowrap;
+  background: linear-gradient(#4a4033, #362e23); border-bottom: 2px solid var(--os-edge-black); box-shadow: 0 1px 0 var(--os-edge-hi);
+}
+.shell-title h1 {
+  margin: 0 0 var(--space-1); font-family: var(--font-bold); font-weight: 400; font-size: var(--text-phase); line-height: 1;
+  color: var(--os-orange); white-space: nowrap;
+}
+.shell-tabs { display: flex; gap: 2px; }
+.shell-tab {
+  display: block; padding: var(--space-1) var(--space-2); text-decoration: none; color: var(--os-orange); white-space: nowrap;
+  background: linear-gradient(#5c5245, #3d352a); border: 2px solid var(--os-edge-black); border-bottom: 0; border-radius: 4px 4px 0 0;
+  box-shadow: inset 1px 1px 0 var(--os-edge-hi);
+}
+.shell-tab:hover { color: var(--os-white); }
+/* The selected tab: yellow text and a yellow outline, never a colour fill. */
+.shell-tab.on { color: var(--os-yellow); box-shadow: inset 0 0 0 1px var(--os-yellow); }
+
+.shell-panel {
+  margin: var(--space-2); padding: var(--space-2); background: var(--os-inset);
+  border: 1px solid var(--os-edge-lo); box-shadow: inset 1px 1px 0 var(--os-edge-black), 1px 1px 0 var(--os-edge-hi);
+}
+.shell-panel h2 {
+  margin: 0 0 var(--space-1); font-family: var(--font-bold); font-weight: 400; font-size: var(--text-body);
+  color: var(--os-orange); text-transform: none; letter-spacing: 0;
+}
+.shell-panel p { margin: 0; color: var(--os-tan); }
+
+.shell-foot { padding: 0 var(--space-2) var(--space-1); text-align: center; color: var(--os-credit); text-shadow: none; }
+.shell-foot a { color: inherit; }
