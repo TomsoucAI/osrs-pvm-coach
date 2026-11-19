@@ -329268,7 +329268,9 @@ var CONTENT_TYPES = {
 var CHANGE_DEBOUNCE_MS = 100;
 var WATCH_RETRY_MS = 1e3;
 var SECURITY_HEADERS = {
-  "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'",
+  // ADR 2 in spec #72: the Briefing's Clips. The browser, not this server, loads Wiki images and clips, YouTube's
+  // thumbnails and its no-cookie player. The page keeps `no-referrer`; only the YouTube frame sets its own policy.
+  "Content-Security-Policy": "default-src 'self'; img-src 'self' https://oldschool.runescape.wiki https://i.ytimg.com; media-src https://oldschool.runescape.wiki; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "Cache-Control": "no-store"

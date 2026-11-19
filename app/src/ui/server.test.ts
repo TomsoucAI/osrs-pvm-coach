@@ -315,9 +315,15 @@ test('every reply carries the security headers and no CORS header', async () => 
     await send('/nope'),
     await send(PLAN, { headers: { Origin: 'https://evil.example' } }),
     await send('/api/state', { method: 'POST' }),
+    await send('/api/briefing?boss=Maggot%20King'),
   ];
   for (const reply of replies) {
-    assert.equal(reply.headers['content-security-policy'], "default-src 'self'; frame-ancestors 'none'");
+    // ADR 2 in spec #72: Wiki images and clips, YouTube's thumbnails and its no-cookie player. Nothing else.
+    assert.equal(
+      reply.headers['content-security-policy'],
+      "default-src 'self'; img-src 'self' https://oldschool.runescape.wiki https://i.ytimg.com; "
+        + "media-src https://oldschool.runescape.wiki; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'",
+    );
     assert.equal(reply.headers['x-content-type-options'], 'nosniff');
     assert.equal(reply.headers['referrer-policy'], 'no-referrer');
     assert.equal(reply.headers['access-control-allow-origin'], undefined);

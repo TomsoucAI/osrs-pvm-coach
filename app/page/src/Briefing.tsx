@@ -1,14 +1,16 @@
 // The Briefing tab (ticket #76): the fight as one scroll, grouped by Phase, drawn straight from the Boss notes.
-// No AI is in this path. The look is prototype variant D's main column (commit d976b26), with the Cheat sheet on top
-// (ticket #77). The pinned player, Clips and HP timeline (ticket 5) are not here yet.
-// The page loads nothing from another site: the hitsplat sprite is served from the page's own folder and the style
-// icons are inline SVG.
+// No AI is in this path. The look is prototype variant D (commit d976b26), with the Cheat sheet on top (ticket #77).
+// On the left, pinned (ticket #78): the selected Mechanic's Clips, its "now" panel and the boss's HP timeline.
+// The two sides are linked: a click on a bar scrolls to its row; scrolling selects the row in view. The selected
+// Mechanic is the URL's anchor (#slam). Only the Clips come from another site (Player.tsx, ADR 2 in spec #72).
 import { useEffect, useState } from 'react';
 import {
   fetchBriefing, type AttackStyle, type BossNotes, type BriefingReply, type Mechanic, type Prayer,
 } from './api';
 import { CheatSheet } from './CheatSheet';
 import { Fact, Hitsplat } from './NotesText';
+import { Player } from './Player';
+import { anchorOf, picked, seen, type Selection } from './selection';
 
 /** v1 holds one boss. The Gear tab's boss, when it has one, stays the same on this tab. */
 const DEFAULT_BOSS = 'Maggot King';
@@ -67,9 +69,9 @@ function SourceLine({ refs, notes }: { refs: Sources; notes: BossNotes }) {
   );
 }
 
-function MechanicRow({ m, notes }: { m: Mechanic; notes: BossNotes }) {
+function MechanicRow({ m, notes, on }: { m: Mechanic; notes: BossNotes; on: boolean }) {
   return (
-    <article id={m.id} className="br-mechanic br-inset">
+    <article id={m.id} data-mechanic={m.id} className={`br-mechanic br-inset ${on ? 'on' : ''}`}>
       <header className="br-mechanic-head">
         <h3>{m.name}</h3><StyleTag style={m.style} /><PrayerBadge prayer={m.prayer} />
       </header>
@@ -84,7 +86,7 @@ function MechanicRow({ m, notes }: { m: Mechanic; notes: BossNotes }) {
   );
 }
 
-function Scroll({ notes }: { notes: BossNotes }) {
+function Scroll({ notes, selected }: { notes: BossNotes; selected: string }) {
   return (
     <div className="br-scroll">
       <p className={`br-status br-inset ${notes.status}`}>
@@ -101,11 +103,109 @@ function Scroll({ notes }: { notes: BossNotes }) {
           <p className="br-phase-sum"><Fact text={p.summary} /></p>
           <p className="br-mistake"><b>Top mistake:</b> <Fact text={p.topMistake} /></p>
           {/* A Mechanic sits in the Phase where it starts. */}
-          {notes.mechanics.filter((m) => m.from <= p.from && m.from > p.to).map((m) => <MechanicRow key={m.id} m={m} notes={notes} />)}
+          {notes.mechanics.filter((m) => m.from <= p.from && m.from > p.to).map((m) => <MechanicRow key={m.id} m={m} notes={notes} on={m.id === selected} />)}
           <SourceLine refs={p.sources} notes={notes} />
         </section>
       ))}
       <p className="br-credit">{notes.credit}</p>
+    </div>
+  );
+}
+
+/** The boss's HP bar, left 100% to right 0%, with a tick per Phase and a bar per Mechanic on its HP range. */
+function Timeline({ notes, selected, onPick }: { notes: BossNotes; selected: Mechanic; onPick: (id: string) => void }) {
+  const at = (hp: number) => `${100 - hp}%`;
+  const span = (from: number, to: number) => ({ left: at(from), width: `${from - to}%` });
+  return (
+    <section className="br-inset tl" aria-label="Mechanics on the boss's HP">
+      <div className="tl-hp" title="Boss HP">
+        <span className="tl-hp-lost" style={{ width: at(selected.from) }} />
+        <span className="tl-hp-text">{selected.from}% HP</span>
+        {notes.phases.slice(1).map((p) => <span key={p.id} className="tl-tick" style={{ left: at(p.from) }} />)}
+      </div>
+      <div className="tl-phases">
+        {notes.phases.map((p) => <span key={p.id} style={span(p.from, p.to)}>{p.name}</span>)}
+      </div>
+      {notes.mechanics.map((m) => (
+        <div key={m.id} className="tl-track">
+          <button
+            type="button" className={`tl-bar style-${m.style} ${m.id === selected.id ? 'on' : ''}`} style={span(m.from, m.to)}
+            aria-pressed={m.id === selected.id} title={`${m.name}: ${m.from}% to ${m.to}% HP`} onClick={() => onPick(m.id)}
+          >
+            {m.name}
+          </button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** The pinned side: the player, the "now" panel and the timeline, all for the selected Mechanic. */
+function Pinned({ notes, selected, onPick }: { notes: BossNotes; selected: Mechanic; onPick: (id: string) => void }) {
+  return (
+    <aside className="br-pinned">
+      <section className="br-inset">
+        {/* A new Mechanic starts at its first Clip. */}
+        <Player key={selected.id} clips={selected.clips} />
+      </section>
+      <section className="br-inset br-now">
+        <header className="br-mechanic-head">
+          <h3>{selected.name}</h3><StyleTag style={selected.style} /><PrayerBadge prayer={selected.prayer} />
+        </header>
+        <p className="br-now-do"><Fact text={selected.do} /></p>
+      </section>
+      <Timeline notes={notes} selected={selected} onPick={onPick} />
+    </aside>
+  );
+}
+
+const scrollToRow = (id: string, behavior: ScrollBehavior) => document.getElementById(id)?.scrollIntoView({ behavior, block: 'center' });
+
+/** Both sides, linked both ways through one selection (selection.ts holds the rule). */
+function Linked({ notes }: { notes: BossNotes }) {
+  const ids = notes.mechanics.map((m) => m.id);
+  const [selection, setSelection] = useState<Selection>(() => ({ id: anchorOf(window.location.hash, ids) ?? notes.killers[0], heading: null }));
+
+  const pick = (id: string, behavior: ScrollBehavior) => {
+    setSelection(picked(id, Date.now()));
+    scrollToRow(id, behavior);
+  };
+
+  // The URL anchor: on open (a link from the Coach), and on a change (the Cheat sheet's links).
+  useEffect(() => {
+    const linked = anchorOf(window.location.hash, ids);
+    if (linked) pick(linked, 'auto');
+    const onHash = () => {
+      const id = anchorOf(window.location.hash, ids);
+      if (id) pick(id, 'smooth');
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [notes]);
+
+  // The row in a band at about 40% of the window's height is the row in view.
+  useEffect(() => {
+    const spy = new IntersectionObserver((entries) => {
+      const hit = entries.find((e) => e.isIntersecting);
+      const id = hit && (hit.target as HTMLElement).dataset.mechanic;
+      if (id) setSelection((s) => seen(s, id, Date.now()));
+    }, { rootMargin: '-35% 0px -55% 0px' });
+    document.querySelectorAll('[data-mechanic]').forEach((row) => spy.observe(row));
+    return () => spy.disconnect();
+  }, [notes]);
+
+  // The URL always names the selected Mechanic. `replaceState` fires no hashchange, so this does not loop.
+  useEffect(() => {
+    if (window.location.hash !== `#${selection.id}`) {
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}#${selection.id}`);
+    }
+  }, [selection.id]);
+
+  const selected = notes.mechanics.find((m) => m.id === selection.id)!;
+  return (
+    <div className="br-body">
+      <Pinned notes={notes} selected={selected} onPick={(id) => pick(id, 'smooth')} />
+      <Scroll notes={notes} selected={selection.id} />
     </div>
   );
 }
@@ -123,5 +223,5 @@ export function Briefing() {
   if (!reply) return <section className="shell-panel"><p>Loading the Briefing…</p></section>;
   if (reply.kind === 'none') return <section className="shell-panel"><h2>{boss}</h2><p>No Boss notes for this boss yet.</p></section>;
   if (reply.kind === 'error') return <section className="shell-panel"><h2>{boss}</h2><p>{reply.message}</p></section>;
-  return <Scroll notes={reply.notes} />;
+  return <Linked notes={reply.notes} />;
 }

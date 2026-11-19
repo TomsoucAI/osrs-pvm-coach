@@ -1,6 +1,5 @@
 // UI server (ADR-1 in spec #1): Node's built-in HTTP server for the bank-mode page.
-// Read-only: the plan, a state summary, the monster search, the Briefing, a server-sent "changed" event, and the built page.
-//
+// Read-only: the plan, a state summary, the monster search, the Briefing, a server-sent "changed" event, and the built page.//
 // Threat model: the Origin/Host guard protects against websites, not against local programs. A local program
 // can forge both headers, and it can read state.json and bank.json from disk with no server at all.
 import { watch, type FSWatcher } from 'node:fs';
@@ -71,7 +70,10 @@ const CONTENT_TYPES: Record<string, string> = {
 const CHANGE_DEBOUNCE_MS = 100;
 const WATCH_RETRY_MS = 1000;
 const SECURITY_HEADERS = {
-  'Content-Security-Policy': "default-src 'self'; frame-ancestors 'none'",
+  // ADR 2 in spec #72: the Briefing's Clips. The browser, not this server, loads Wiki images and clips, YouTube's
+  // thumbnails and its no-cookie player. The page keeps `no-referrer`; only the YouTube frame sets its own policy.
+  'Content-Security-Policy': "default-src 'self'; img-src 'self' https://oldschool.runescape.wiki https://i.ytimg.com; "
+    + "media-src https://oldschool.runescape.wiki; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'Cache-Control': 'no-store',

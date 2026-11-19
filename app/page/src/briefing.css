@@ -112,3 +112,71 @@
 .cs-gear-line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); width: 186px; }
 .cs-gear-line b { font-family: var(--font-bold); font-weight: 400; color: var(--os-yellow); }
 .cs-why { max-width: 186px; color: var(--os-tan); }
+
+/* Ticket #78: prototype variant D's two columns. Left, pinned while the fight scrolls: the player, the "now" panel
+   and the HP timeline. On a narrow window the left side goes on top and stops being pinned. */
+.br-body { display: grid; grid-template-columns: minmax(360px, 440px) minmax(0, 1fr); gap: var(--space-2); align-items: start; padding: var(--space-2); }
+.br-body .br-scroll { padding: 0 0 50vh; } /* The last rows can reach the band that selects the row in view. */
+.br-pinned {
+  position: sticky; top: var(--space-2); display: grid; gap: var(--space-2);
+  max-height: calc(100vh - 2 * var(--space-2)); overflow-y: auto; /* A short window still reaches the whole timeline. */
+  font-family: var(--font-plain); font-size: var(--text-body); line-height: 1.5; color: var(--os-white); text-shadow: var(--os-text-shadow);
+}
+.br-pinned p { margin: 0; }
+@media (max-width: 880px) {
+  .br-body { grid-template-columns: 1fr; }
+  .br-pinned { position: static; max-height: none; }
+  .br-body .br-scroll { padding-bottom: 0; }
+}
+/* The selected row: the yellow outline of a selection, never a colour fill. */
+.br-mechanic.on { border-color: var(--os-yellow); box-shadow: 0 0 0 1px var(--os-yellow); }
+
+/* The "now" panel: the selected Mechanic's name, style, prayer and Do line. */
+.br-now { display: grid; gap: var(--space-1); }
+.br-now-do { font-family: var(--font-bold); font-size: var(--text-do); line-height: 1.4; color: var(--os-white); }
+
+/* The player. One screen size for every Clip, so the panels under it never jump. */
+.pl { margin: 0; display: grid; gap: var(--space-1); }
+.pl-screen {
+  position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; overflow: hidden;
+  background: var(--os-edge-black); border: 1px solid var(--os-edge-lo);
+}
+.pl-screen video, .pl-screen iframe, .pl-screen img { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: contain; }
+.pl-facade { cursor: pointer; }
+.pl-facade img { object-fit: cover; opacity: .8; }
+.pl-play {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 48px; height: 48px; border-radius: 50%;
+  display: grid; place-items: center; background: rgba(0, 0, 0, .65); color: var(--os-yellow); font-size: var(--text-do);
+}
+.pl-badge {
+  position: absolute; right: var(--space-1); bottom: var(--space-1); padding: 0 var(--space-1);
+  background: rgba(0, 0, 0, .7); color: var(--os-tan); border: 0; font: inherit;
+}
+.pl-replay { cursor: pointer; color: var(--os-white); }
+.pl-replay:hover, .pl-replay:focus-visible { box-shadow: 0 0 0 1px var(--os-yellow); outline: none; }
+.pl-none { display: grid; place-items: center; color: var(--os-tan); }
+.pl-pills { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.pl figcaption b { color: var(--os-tan); font-family: var(--font-bold); font-weight: 400; }
+.pl-credit { color: var(--os-credit); text-shadow: none; }
+
+/* The HP timeline: the game's HP bar (green left, red lost), a tick per Phase, a bar per Mechanic on its HP range.
+   HARD RULE: each bar takes its style's colour (`style-<style>`, pieces.css); typeless stays tan. */
+.tl { display: grid; gap: var(--space-1); }
+.tl-hp { position: relative; height: 24px; background: #1fb01f; border: 1px solid var(--os-edge-black); overflow: hidden; }
+.tl-hp-lost { position: absolute; left: 0; top: 0; bottom: 0; background: #a31208; transition: width .35s ease; }
+.tl-hp-text { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-bold); }
+.tl-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--os-edge-black); }
+.tl-phases { position: relative; height: 24px; }
+.tl-phases span {
+  position: absolute; top: 0; box-sizing: border-box; padding-left: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  color: var(--os-tan); border-left: 1px solid var(--os-edge-hi);
+}
+.tl-track { position: relative; height: 24px; background: var(--os-well); }
+.tl-bar {
+  position: absolute; top: 0; bottom: 0; box-sizing: border-box; padding: 0 var(--space-1); text-align: left; cursor: pointer;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font: inherit; color: var(--style, var(--os-tan)); text-shadow: var(--os-text-shadow);
+  background: var(--os-stone); border: 1px solid var(--os-edge-black); box-shadow: inset 4px 0 0 var(--style, var(--os-tan));
+}
+.tl-bar.on { border-color: var(--os-yellow); box-shadow: inset 4px 0 0 var(--style, var(--os-tan)), 0 0 0 1px var(--os-yellow); }
+.tl-bar:focus-visible { outline: 1px solid var(--os-yellow); }

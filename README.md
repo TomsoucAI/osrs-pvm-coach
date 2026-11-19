@@ -12,7 +12,7 @@ Two front ends share that core: an MCP server for Claude (Code or Desktop) and a
 
 ```mermaid
 flowchart LR
-    subgraph PC["Your PC (our code makes no internet requests)"]
+    subgraph PC["Your PC"]
         RL["RuneLite client"]
         PL["plugin/<br/>DPS Bridge (read-only)"]
         F[("state.json + bank.json<br/>~/.runelite/plugin-data/dps_bridge/")]
@@ -23,6 +23,8 @@ flowchart LR
     end
     C["Claude<br/>(Code or Desktop)"]
     B["Browser<br/>bank-mode page"]
+    W["OSRS Wiki"]
+    Y["YouTube no-cookie player"]
 
     RL --> PL
     PL -->|writes on change| F
@@ -33,6 +35,9 @@ flowchart LR
     WS -.->|"WebSocket :37767"| MCP
     MCP -->|"DPS, max hit, TTK, best owned setup"| C
     UI -->|"plan + live push"| B
+    UI -.->|"item icons (cached)"| W
+    B -.->|"Briefing Clips"| W
+    B -.->|"a Clip, after a click"| Y
 ```
 
 | Folder | What it is | Language |
@@ -88,7 +93,8 @@ Two layers enforce the rules, because legality is about what a feature *does*, a
 
 ### Account safety
 
-- Nothing here asks for, reads or stores your password. The MCP and the UI server make no internet requests. They read local files, and the MCP also reads WikiSync on localhost. Claude gets the answers that the MCP returns.
+- Nothing here asks for, reads or stores your password. The MCP makes no internet requests: it reads local files and WikiSync on localhost. The UI server makes one kind: it fetches item icons from the OSRS Wiki and keeps them on disk. Claude gets the answers that the MCP returns.
+- The browser, not our code, loads the Briefing's Clips: videos from the OSRS Wiki; for a YouTube Clip, its thumbnail from YouTube's image host, then YouTube's no-cookie player only after you click it. The page's security headers allow these hosts and no others. The page sends no referrer; only the YouTube frame sends the page's origin, because the player refuses to play without one.
 - Dev client login goes through Jagex's own login window. The session is stored encrypted in `~/.runelite/jagex-accounts.dat`; the key is in Windows Credential Manager. No password is stored.
 - If you ever created `~/.runelite/credentials.properties` (old login method), delete it.
 - The repo-root `.claude/settings.json` denies Claude Code's `Read` and `Edit` of `credentials.properties` and `jagex-accounts.dat`. This also blocks Bash commands that name the file (`cat`, `head`, redirections). **Residual risk:** it does not block a command that reads the file without naming it (`grep -r`) or a subprocess (`node -e`, `sh -c`). Only the Claude Code sandbox closes that gap, and it does not run on native Windows (WSL2 only). A read gives an encrypted session, not your password. Accepted for now; see #30.
