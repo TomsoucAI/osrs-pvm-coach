@@ -105,3 +105,44 @@ test('a damage range other than "55" or "15–25" is refused', async () => {
 
   await assert.rejects(readBriefing(broken, 'Maggot King'), /missDamage/);
 });
+
+// The Cheat sheet (ticket #77): what kills you and what to bring come from the notes.
+test('the Maggot King notes name the Mechanics that kill you, in their order', async () => {
+  const notes = await readBriefing(NOTES_DIR, 'Maggot King');
+
+  assert.deepEqual(notes?.killers, ['screech', 'slam', 'larvae']);
+});
+
+test('a killer that names no Mechanic of the file is refused', async () => {
+  const notes = await maggotKing();
+  const broken = await folderWith('bad-killer', 'maggot-king.json', { ...notes, killers: ['screech', 'tail-swipe'] });
+
+  await assert.rejects(readBriefing(broken, 'Maggot King'), /tail-swipe/);
+});
+
+test('more than 3 killers is refused: the Cheat sheet holds the top 3', async () => {
+  const notes = await maggotKing();
+  const broken = await folderWith('four-killers', 'maggot-king.json', {
+    ...notes, killers: ['screech', 'slam', 'larvae', 'carrion'],
+  });
+
+  await assert.rejects(readBriefing(broken, 'Maggot King'), /killers/);
+});
+
+test('the Maggot King inventory to bring fills the 28 slots, each item with its game id and a source', async () => {
+  const notes = await readBriefing(NOTES_DIR, 'Maggot King');
+
+  assert.equal(notes?.inventory.items.length, 28);
+  assert.deepEqual(notes?.inventory.items[10], { item: 'Anglerfish', id: 13441 });
+  assert.ok(notes?.inventory.sources.length);
+});
+
+test('an inventory of more than 28 items is refused', async () => {
+  const notes = await maggotKing();
+  const inventory = notes.inventory as { items: unknown[] };
+  const broken = await folderWith('big-inventory', 'maggot-king.json', {
+    ...notes, inventory: { ...inventory, items: [...inventory.items, { item: 'Anglerfish', id: 13441 }] },
+  });
+
+  await assert.rejects(readBriefing(broken, 'Maggot King'), /inventory/);
+});

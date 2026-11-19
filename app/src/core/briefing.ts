@@ -92,12 +92,27 @@ const BossNotesSchema = z.strictObject({
   mistakes: z.array(z.strictObject({ mistake: text, fix: text, ...sourced })).min(1),
   // The drops, for the Goals tab: the rate is 1 in `oneIn` kills.
   drops: z.array(z.strictObject({ item: text, oneIn: z.number().min(1), note: text.optional(), ...sourced })).min(1),
+  // The Cheat sheet (ticket #77). `killers`: the ids of the Mechanics that kill you most, the worst first.
+  killers: z.array(anchor).min(1).max(3),
+  // The inventory to bring, slot by slot as the game draws it (4 × 7). `id` is the game's item id; its icon is the
+  // Wiki image "<item>.png". `note` says which setup it is for.
+  inventory: z.strictObject({
+    note: text,
+    items: z.array(z.strictObject({ item: text, id: z.number().int().positive() })).min(1).max(28),
+    ...sourced,
+  }),
 }).superRefine((notes, ctx) => {
   // Every source that a fact names is listed in the file.
   const check = (refs: z.infer<typeof SourceRef>[], path: (string | number)[]) => refs.forEach(({ ref }, i) => {
     if (!(ref in notes.sources)) ctx.addIssue({ code: 'custom', message: `unknown source "${ref}"`, path: [...path, 'sources', i, 'ref'] });
   });
   check(notes.styles.sources, ['styles']);
+  check(notes.inventory.sources, ['inventory']);
+  // Each killer is a Mechanic of this file, named once.
+  notes.killers.forEach((id, i) => {
+    if (!notes.mechanics.some((m) => m.id === id)) ctx.addIssue({ code: 'custom', message: `killer "${id}" is no Mechanic of this file`, path: ['killers', i] });
+    if (notes.killers.indexOf(id) !== i) ctx.addIssue({ code: 'custom', message: `killer "${id}" is named twice`, path: ['killers', i] });
+  });
   for (const part of ['phases', 'mechanics', 'methods', 'gearPrinciples', 'combatAchievements', 'mistakes', 'drops'] as const) {
     notes[part].forEach((fact, i) => check(fact.sources, [part, i]));
   }

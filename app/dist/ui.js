@@ -329037,12 +329037,26 @@ var BossNotesSchema = external_exports.strictObject({
   })).min(1),
   mistakes: external_exports.array(external_exports.strictObject({ mistake: text, fix: text, ...sourced })).min(1),
   // The drops, for the Goals tab: the rate is 1 in `oneIn` kills.
-  drops: external_exports.array(external_exports.strictObject({ item: text, oneIn: external_exports.number().min(1), note: text.optional(), ...sourced })).min(1)
+  drops: external_exports.array(external_exports.strictObject({ item: text, oneIn: external_exports.number().min(1), note: text.optional(), ...sourced })).min(1),
+  // The Cheat sheet (ticket #77). `killers`: the ids of the Mechanics that kill you most, the worst first.
+  killers: external_exports.array(anchor2).min(1).max(3),
+  // The inventory to bring, slot by slot as the game draws it (4 × 7). `id` is the game's item id; its icon is the
+  // Wiki image "<item>.png". `note` says which setup it is for.
+  inventory: external_exports.strictObject({
+    note: text,
+    items: external_exports.array(external_exports.strictObject({ item: text, id: external_exports.number().int().positive() })).min(1).max(28),
+    ...sourced
+  })
 }).superRefine((notes, ctx) => {
   const check2 = (refs, path) => refs.forEach(({ ref }, i) => {
     if (!(ref in notes.sources)) ctx.addIssue({ code: "custom", message: `unknown source "${ref}"`, path: [...path, "sources", i, "ref"] });
   });
   check2(notes.styles.sources, ["styles"]);
+  check2(notes.inventory.sources, ["inventory"]);
+  notes.killers.forEach((id, i) => {
+    if (!notes.mechanics.some((m) => m.id === id)) ctx.addIssue({ code: "custom", message: `killer "${id}" is no Mechanic of this file`, path: ["killers", i] });
+    if (notes.killers.indexOf(id) !== i) ctx.addIssue({ code: "custom", message: `killer "${id}" is named twice`, path: ["killers", i] });
+  });
   for (const part of ["phases", "mechanics", "methods", "gearPrinciples", "combatAchievements", "mistakes", "drops"]) {
     notes[part].forEach((fact, i) => check2(fact.sources, [part, i]));
   }
@@ -329074,6 +329088,9 @@ ${external_exports.prettifyError(parsed.error)}`);
 async function readBriefing(notesDir, boss) {
   const file2 = fileOf(boss);
   return (await noteFiles(notesDir)).includes(file2) ? load(notesDir, file2) : null;
+}
+async function listBossNotes(notesDir) {
+  return Promise.all((await noteFiles(notesDir)).map((file2) => load(notesDir, file2)));
 }
 
 // src/core/liveState.ts
@@ -329179,7 +329196,7 @@ async function readCapped(reply) {
   }
   return Buffer.concat(chunks);
 }
-function createIconCache(dir, fetchIcon) {
+function createIconCache(dir, fetchIcon, otherImage = async () => null) {
   const noIcon = /* @__PURE__ */ new Set();
   const pending = /* @__PURE__ */ new Map();
   async function download(id, image) {
@@ -329205,8 +329222,9 @@ function createIconCache(dir, fetchIcon) {
   }
   return {
     async get(itemId) {
-      const item = findItem(itemId);
-      if (!item?.image) return null;
+      const equipment = findItem(itemId);
+      const item = equipment?.image ? { id: equipment.id, image: equipment.image } : { id: itemId, image: await otherImage(itemId) };
+      if (!item.image) return null;
       const cached2 = await readFile3(join3(dir, `${item.id}.png`)).catch(() => null);
       if (cached2) return cached2;
       if (noIcon.has(item.id)) return null;
@@ -329341,7 +329359,11 @@ async function listPage(pageDir) {
 async function startUiServer(options) {
   const streams = /* @__PURE__ */ new Set();
   const pageFiles = await listPage(options.pageDir);
-  const icons = createIconCache(options.iconCacheDir, options.fetchIcon ?? fetch);
+  const icons = createIconCache(options.iconCacheDir, options.fetchIcon ?? fetch, async (id) => {
+    const notes = await listBossNotes(options.bossNotesDir).catch(() => []);
+    const hit = notes.flatMap((n) => n.inventory.items).find((i) => i.id === id);
+    return hit ? `${hit.item}.png` : null;
+  });
   let ownOrigins = /* @__PURE__ */ new Set();
   const isOwnPage = (req) => {
     const own2 = `http://${req.headers.host}`;
