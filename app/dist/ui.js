@@ -329092,6 +329092,11 @@ async function readBriefing(notesDir, boss) {
 async function listBossNotes(notesDir) {
   return Promise.all((await noteFiles(notesDir)).map((file2) => load(notesDir, file2)));
 }
+async function inventoryImage(notesDir, itemId) {
+  const notes = await listBossNotes(notesDir).catch(() => []);
+  const hit = notes.flatMap((n) => n.inventory.items).find((i) => i.id === itemId);
+  return hit ? `${hit.item}.png` : null;
+}
 
 // src/core/liveState.ts
 import { readFile as readFile2 } from "node:fs/promises";
@@ -329359,11 +329364,7 @@ async function listPage(pageDir) {
 async function startUiServer(options) {
   const streams = /* @__PURE__ */ new Set();
   const pageFiles = await listPage(options.pageDir);
-  const icons = createIconCache(options.iconCacheDir, options.fetchIcon ?? fetch, async (id) => {
-    const notes = await listBossNotes(options.bossNotesDir).catch(() => []);
-    const hit = notes.flatMap((n) => n.inventory.items).find((i) => i.id === id);
-    return hit ? `${hit.item}.png` : null;
-  });
+  const icons = createIconCache(options.iconCacheDir, options.fetchIcon ?? fetch, (id) => inventoryImage(options.bossNotesDir, id));
   let ownOrigins = /* @__PURE__ */ new Set();
   const isOwnPage = (req) => {
     const own2 = `http://${req.headers.host}`;

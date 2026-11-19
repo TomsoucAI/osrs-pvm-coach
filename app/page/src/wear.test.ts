@@ -2,7 +2,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import type { BankModePlan, Setup, StateSummary } from './api';
-import { wearOf } from './wear';
+import { STATIC_CONTROLS, wearOf } from './wear';
 
 const SETUP = { dps: 7.5, maxHit: 52 } as Setup;
 const IN: StateSummary = { loggedIn: true, playerName: 'FixtureIron', bankAgeMs: 60_000, worn: null, wornIds: null };
@@ -39,8 +39,13 @@ test('a style the player cannot attack with gives the plan\'s own reason', () =>
   assert.deepEqual(wear, { kind: 'why', why: 'No owned weapon attacks with melee.' });
 });
 
-test('logged in with no plan: the panel says the plan failed', () => {
+test('logged in with no plan: the panel says the setup search failed', () => {
   const wear = wearOf({ summary: IN, plan: null }, 'melee');
 
   assert.equal(wear.kind, 'why');
+  assert.match(wear.kind === 'why' ? wear.why : '', /setup search .* failed/);
+});
+
+test('the Wear request takes nothing from the fight: no drains, Planned boosts (legality condition)', () => {
+  assert.deepEqual(STATIC_CONTROLS, { boosts: 'planned', drains: 'none', bgsDamage: 0, pins: {} });
 });

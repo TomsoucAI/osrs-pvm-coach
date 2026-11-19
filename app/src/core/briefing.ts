@@ -162,3 +162,10 @@ export async function readBriefing(notesDir: string, boss: string): Promise<Boss
 export async function listBossNotes(notesDir: string): Promise<BossNotes[]> {
   return Promise.all((await noteFiles(notesDir)).map((file) => load(notesDir, file)));
 }
+
+/** The Wiki image of an item that a notes inventory lists ("<item>.png"), or null. A malformed folder gives null. */
+export async function inventoryImage(notesDir: string, itemId: number): Promise<string | null> {
+  const notes = await listBossNotes(notesDir).catch(() => []);
+  const hit = notes.flatMap((n) => n.inventory.items).find((i) => i.id === itemId);
+  return hit ? `${hit.item}.png` : null;
+}

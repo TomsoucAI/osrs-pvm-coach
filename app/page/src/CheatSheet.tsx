@@ -7,15 +7,13 @@
 import { useEffect, useState } from 'react';
 import { DOLL } from './App';
 import {
-  fetchBankMode, searchMonsters, type BossNotes, type CombatStyle, type Controls,
+  fetchBankMode, searchMonsters, type BossNotes, type CombatStyle,
 } from './api';
 import { MaxHit } from './MaxHit';
 import { Fact, Hitsplat } from './NotesText';
-import { wearOf, type Wear } from './wear';
+import { STATIC_CONTROLS, wearOf, type Wear } from './wear';
 
 const STYLES: CombatStyle[] = ['melee', 'ranged', 'magic'];
-/** The plan's controls, fixed: nothing in them comes from the fight. */
-const STATIC_CONTROLS: Controls = { boosts: 'planned', drains: 'none', bgsDamage: 0, pins: {} };
 /** The game's inventory: 4 × 7 slots. */
 const INVENTORY_SLOTS = 28;
 
