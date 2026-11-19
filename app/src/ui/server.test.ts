@@ -293,6 +293,19 @@ test('the built page serves the RuneScape fonts from its own folder, with a font
   }
 });
 
+test('the built page serves the max-hit hitsplat sprite from its own folder, with an image content type', async () => {
+  const built = await startUiServer({
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: resolve('dist', 'page'), iconCacheDir: join(dir, 'icons'),
+  });
+  try {
+    const reply = await send('/sprites/max-hit-hitsplat.png', { on: built });
+    assert.equal(reply.status, 200);
+    assert.equal(reply.headers['content-type'], 'image/png');
+  } finally {
+    await built.close();
+  }
+});
+
 test('every reply carries the security headers and no CORS header', async () => {
   const replies = [
     await send('/'),

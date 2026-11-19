@@ -1,0 +1,22 @@
+/* The game pieces that every tab shares (spec #72). Each rule is written here once; a tab only adds the class. */
+
+/* HARD RULE: combat style has one colour everywhere. Melee red, ranged green, magic blue.
+   Every style tag, protection prayer, timeline bar and style button takes `style-<style>`. */
+.style-melee { --style: var(--os-melee); }
+.style-ranged { --style: var(--os-ranged); }
+.style-magic { --style: var(--os-magic); }
+/* The colour holds on hover too. This file loads after the tabs' stylesheets, so it wins a tie. */
+.style-melee, .style-ranged, .style-magic,
+:is(.style-melee, .style-ranged, .style-magic):hover { color: var(--style); }
+
+/* Selection is a yellow outline, never a colour fill: the element keeps its own colours. */
+.btn.on, .tier-card.on { border-color: var(--os-yellow); box-shadow: 0 0 0 1px var(--os-yellow); }
+
+/* Max hit: the game's max-hit hitsplat sprite (OSRS Wiki, Jagex's image: same accepted risk as the item icons).
+   The 24px sprite draws at 2x, so its pixels stay sharp. */
+.max-hit {
+  display: inline-grid; place-items: center; box-sizing: border-box; min-width: 48px; height: 48px; padding: 0 var(--space-1);
+  background: url("/sprites/max-hit-hitsplat.png") center / 100% 100% no-repeat; image-rendering: pixelated;
+  font-family: var(--font-plain); font-size: var(--text-body); line-height: 1; color: var(--os-white); text-shadow: var(--os-text-shadow);
+  vertical-align: middle;
+}
