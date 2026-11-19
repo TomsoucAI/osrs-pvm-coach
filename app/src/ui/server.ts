@@ -1,5 +1,5 @@
 // UI server (ADR-1 in spec #1): Node's built-in HTTP server for the bank-mode page.
-// Read-only: the plan, a state summary, the monster search, a server-sent "changed" event, and the built page.
+// Read-only: the plan, a state summary, the monster search, the Briefing, a server-sent "changed" event, and the built page.
 //
 // Threat model: the Origin/Host guard protects against websites, not against local programs. A local program
 // can forge both headers, and it can read state.json and bank.json from disk with no server at all.
@@ -14,6 +14,7 @@ import {
 import {
   planBankMode, type BankModeRequest, type BoostMode, type CombatStyle, type Slot,
 } from '../core/bankMode';
+import { readBriefing, type BossNotes } from '../core/briefing';
 import { readState, type LiveState } from '../core/liveState';
 import { createIconCache } from './icons';
 
@@ -26,6 +27,8 @@ export interface UiServerOptions {
   pageDir: string;
   /** Where item icons are kept after the first fetch. */
   iconCacheDir: string;
+  /** The Boss notes folder (repo `boss-notes/`), read by the Briefing endpoint. */
+  bossNotesDir: string;
   /** The wiki fetch. Tests replace it; the app uses the global `fetch`. */
   fetchIcon?: typeof fetch;
 }
@@ -215,6 +218,20 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
       }
       case '/api/state':
         return sendJson(res, 200, summarize(await readLiveState()));
+      case '/api/briefing': {
+        // Legality condition: the Boss notes only. Never the state file, so never the target or a live combat field.
+        const boss = query.get('boss');
+        if (!boss) throw new HttpError(400, 'The "boss" parameter is required.');
+        let notes: BossNotes | null;
+        try {
+          notes = await readBriefing(options.bossNotesDir, boss);
+        } catch (e) {
+          console.error(e);
+          throw new HttpError(500, 'The Boss notes for this boss are malformed.');
+        }
+        if (!notes) throw new HttpError(404, 'No Boss notes for this boss yet.');
+        return sendJson(res, 200, notes);
+      }
       case '/api/monsters': {
         const q = query.get('q') ?? '';
         const hits = q.length < 2 ? [] : searchMonsters(q).slice(0, 50).map(({ name, version }) => ({ name, version }));

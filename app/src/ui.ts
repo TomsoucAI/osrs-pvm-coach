@@ -27,6 +27,8 @@ try {
     bankFile: join(dirname(stateFile), 'bank.json'),
     pageDir: join(dirname(fileURLToPath(import.meta.url)), 'page'),
     iconCacheDir: join(homedir(), '.osrs-pvm-coach', 'icons'),
+    // dist/ui.js → the repo's top-level boss-notes/ folder.
+    bossNotesDir: join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'boss-notes'),
   });
   console.log(`Bank mode: http://127.0.0.1:${server.port}/  (${values.fixture ? 'fixture' : 'live'}: ${dirname(stateFile)})`);
   console.log('Stop with Ctrl+C.');

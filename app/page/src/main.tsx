@@ -5,5 +5,6 @@ import './tokens.css';
 import './styles.css';
 import './shell.css';
 import './pieces.css';
+import './briefing.css';
 
 createRoot(document.getElementById('root')!).render(<StrictMode><Shell /></StrictMode>);

@@ -2,6 +2,7 @@
 // The tab lives in the URL (`?tab=briefing`). No `tab` is Gear, so the bank-mode links of #9 keep working.
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { App as Gear } from './App';
+import { Briefing } from './Briefing';
 
 type Tab = 'gear' | 'briefing' | 'goals';
 
@@ -54,7 +55,7 @@ export function Shell() {
 
   let body: ReactNode;
   if (tab === 'gear') body = <Gear />;
-  else if (tab === 'briefing') body = <NotBuilt name="Briefing" />;
+  else if (tab === 'briefing') body = <Briefing />;
   else body = <NotBuilt name="Goals" />;
 
   return (
