@@ -25,7 +25,7 @@ function WikiClip({ clip }: { clip: Extract<Clip, { kind: 'wiki' }> }) {
 function YouTubeClip({ clip }: { clip: Extract<Clip, { kind: 'youtube' }> }) {
   const [open, setOpen] = useState(false);
   /** A new key loads the frame again: the player goes back to the Clip's start. */
-  const [run, setRun] = useState(0);
+  const [frameKey, setFrameKey] = useState(0);
   if (!open) {
     return (
       <button type="button" className="pl-screen pl-facade" onClick={() => setOpen(true)} aria-label={`Play the Clip: ${clip.label}`}>
@@ -40,13 +40,13 @@ function YouTubeClip({ clip }: { clip: Extract<Clip, { kind: 'youtube' }> }) {
       {/* The page sends no referrer (server header). YouTube's player refuses to play without one (error 153), so
           only this frame sets its own policy: the player gets the page's origin, never its path. */}
       <iframe
-        key={run}
+        key={frameKey}
         src={youTubeEmbedUrl(clip)}
         title={clip.label}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         referrerPolicy="strict-origin-when-cross-origin"
       />
-      <button type="button" className="pl-badge pl-replay" onClick={() => setRun(run + 1)}>↺ Replay</button>
+      <button type="button" className="pl-badge pl-again" onClick={() => setFrameKey(frameKey + 1)}>↺ Play again</button>
     </div>
   );
 }
@@ -64,7 +64,7 @@ export function Player({ clips }: { clips: Clip[] }) {
       {clips.length > 1 && (
         <div className="pl-pills">
           {clips.map((c, i) => (
-            <button key={c.label} type="button" className={`btn ${i === index ? 'on' : ''}`} aria-pressed={i === index} onClick={() => setIndex(i)}>
+            <button key={i} type="button" className={`btn ${i === index ? 'on' : ''}`} aria-pressed={i === index} onClick={() => setIndex(i)}>
               {c.label}
             </button>
           ))}

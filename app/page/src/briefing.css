@@ -152,8 +152,8 @@
   position: absolute; right: var(--space-1); bottom: var(--space-1); padding: 0 var(--space-1);
   background: rgba(0, 0, 0, .7); color: var(--os-tan); border: 0; font: inherit;
 }
-.pl-replay { cursor: pointer; color: var(--os-white); }
-.pl-replay:hover, .pl-replay:focus-visible { box-shadow: 0 0 0 1px var(--os-yellow); outline: none; }
+.pl-again { cursor: pointer; color: var(--os-white); }
+.pl-again:hover, .pl-again:focus-visible { box-shadow: 0 0 0 1px var(--os-yellow); outline: none; }
 .pl-none { display: grid; place-items: center; color: var(--os-tan); }
 .pl-pills { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .pl figcaption b { color: var(--os-tan); font-family: var(--font-bold); font-weight: 400; }
@@ -162,13 +162,13 @@
 /* The HP timeline: the game's HP bar (green left, red lost), a tick per Phase, a bar per Mechanic on its HP range.
    HARD RULE: each bar takes its style's colour (`style-<style>`, pieces.css); typeless stays tan. */
 .tl { display: grid; gap: var(--space-1); }
-.tl-hp { position: relative; height: 24px; background: #1fb01f; border: 1px solid var(--os-edge-black); overflow: hidden; }
-.tl-hp-lost { position: absolute; left: 0; top: 0; bottom: 0; background: #a31208; transition: width .35s ease; }
+.tl-hp { position: relative; height: 24px; background: var(--os-hp); border: 1px solid var(--os-edge-black); overflow: hidden; }
+.tl-hp-lost { position: absolute; left: 0; top: 0; bottom: 0; background: var(--os-hp-lost); transition: width .35s ease; }
 .tl-hp-text { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-bold); }
 .tl-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--os-edge-black); }
 .tl-phases { position: relative; height: 24px; }
 .tl-phases span {
-  position: absolute; top: 0; box-sizing: border-box; padding-left: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  position: absolute; top: 0; box-sizing: border-box; padding-left: var(--space-1); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   color: var(--os-tan); border-left: 1px solid var(--os-edge-hi);
 }
 .tl-track { position: relative; height: 24px; background: var(--os-well); }

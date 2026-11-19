@@ -1,5 +1,6 @@
 // UI server (ADR-1 in spec #1): Node's built-in HTTP server for the bank-mode page.
-// Read-only: the plan, a state summary, the monster search, the Briefing, a server-sent "changed" event, and the built page.//
+// Read-only: the plan, a state summary, the monster search, the Briefing, a server-sent "changed" event, and the built page.
+//
 // Threat model: the Origin/Host guard protects against websites, not against local programs. A local program
 // can forge both headers, and it can read state.json and bank.json from disk with no server at all.
 import { watch, type FSWatcher } from 'node:fs';

@@ -3,7 +3,7 @@
 // On the left, pinned (ticket #78): the selected Mechanic's Clips, its "now" panel and the boss's HP timeline.
 // The two sides are linked: a click on a bar scrolls to its row; scrolling selects the row in view. The selected
 // Mechanic is the URL's anchor (#slam). Only the Clips come from another site (Player.tsx, ADR 2 in spec #72).
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import {
   fetchBriefing, type AttackStyle, type BossNotes, type BriefingReply, type Mechanic, type Prayer,
 } from './api';
@@ -69,12 +69,19 @@ function SourceLine({ refs, notes }: { refs: Sources; notes: BossNotes }) {
   );
 }
 
-function MechanicRow({ m, notes, on }: { m: Mechanic; notes: BossNotes; on: boolean }) {
+/** A Mechanic's name, style and prayer: in its row and in the "now" panel. */
+function MechanicHead({ m }: { m: Mechanic }) {
   return (
-    <article id={m.id} data-mechanic={m.id} className={`br-mechanic br-inset ${on ? 'on' : ''}`}>
-      <header className="br-mechanic-head">
-        <h3>{m.name}</h3><StyleTag style={m.style} /><PrayerBadge prayer={m.prayer} />
-      </header>
+    <header className="br-mechanic-head">
+      <h3>{m.name}</h3><StyleTag style={m.style} /><PrayerBadge prayer={m.prayer} />
+    </header>
+  );
+}
+
+function MechanicRow({ m, notes, selected }: { m: Mechanic; notes: BossNotes; selected: boolean }) {
+  return (
+    <article id={m.id} data-mechanic={m.id} className={`br-mechanic br-inset ${selected ? 'on' : ''}`}>
+      <MechanicHead m={m} />
       <dl className="br-table">
         <div className="br-line"><dt>Tell</dt><dd><Fact text={m.tell} /></dd></div>
         <div className="br-line br-do"><dt>Do</dt><dd><Fact text={m.do} /></dd></div>
@@ -103,7 +110,7 @@ function Scroll({ notes, selected }: { notes: BossNotes; selected: string }) {
           <p className="br-phase-sum"><Fact text={p.summary} /></p>
           <p className="br-mistake"><b>Top mistake:</b> <Fact text={p.topMistake} /></p>
           {/* A Mechanic sits in the Phase where it starts. */}
-          {notes.mechanics.filter((m) => m.from <= p.from && m.from > p.to).map((m) => <MechanicRow key={m.id} m={m} notes={notes} on={m.id === selected} />)}
+          {notes.mechanics.filter((m) => m.from <= p.from && m.from > p.to).map((m) => <MechanicRow key={m.id} m={m} notes={notes} selected={m.id === selected} />)}
           <SourceLine refs={p.sources} notes={notes} />
         </section>
       ))}
@@ -149,9 +156,7 @@ function Pinned({ notes, selected, onPick }: { notes: BossNotes; selected: Mecha
         <Player key={selected.id} clips={selected.clips} />
       </section>
       <section className="br-inset br-now">
-        <header className="br-mechanic-head">
-          <h3>{selected.name}</h3><StyleTag style={selected.style} /><PrayerBadge prayer={selected.prayer} />
-        </header>
+        <MechanicHead m={selected} />
         <p className="br-now-do"><Fact text={selected.do} /></p>
       </section>
       <Timeline notes={notes} selected={selected} onPick={onPick} />
@@ -171,7 +176,18 @@ function Linked({ notes }: { notes: BossNotes }) {
     scrollToRow(id, behavior);
   };
 
-  // The URL anchor: on open (a link from the Coach), and on a change (the Cheat sheet's links).
+  // A link to a row inside the page (the Cheat sheet's) selects through the same path as a bar: one smooth scroll,
+  // and it works for the Mechanic that is already selected too. A Ctrl+click or middle click stays the browser's.
+  const onLinkClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const href = (e.target as Element).closest('a')?.getAttribute('href');
+    const id = href && anchorOf(href, ids);
+    if (!id) return;
+    e.preventDefault();
+    pick(id, 'smooth');
+  };
+
+  // The URL anchor: on open (a link from the Coach), and on a change (a link typed or pasted into this tab).
   useEffect(() => {
     const linked = anchorOf(window.location.hash, ids);
     if (linked) pick(linked, 'auto');
@@ -203,7 +219,7 @@ function Linked({ notes }: { notes: BossNotes }) {
 
   const selected = notes.mechanics.find((m) => m.id === selection.id)!;
   return (
-    <div className="br-body">
+    <div className="br-body" onClick={onLinkClick}>
       <Pinned notes={notes} selected={selected} onPick={(id) => pick(id, 'smooth')} />
       <Scroll notes={notes} selected={selection.id} />
     </div>
@@ -223,5 +239,6 @@ export function Briefing() {
   if (!reply) return <section className="shell-panel"><p>Loading the Briefing…</p></section>;
   if (reply.kind === 'none') return <section className="shell-panel"><h2>{boss}</h2><p>No Boss notes for this boss yet.</p></section>;
   if (reply.kind === 'error') return <section className="shell-panel"><h2>{boss}</h2><p>{reply.message}</p></section>;
-  return <Linked notes={reply.notes} />;
+  // A new boss starts a new selection: an id of the old notes can never reach the new ones.
+  return <Linked key={boss} notes={reply.notes} />;
 }
