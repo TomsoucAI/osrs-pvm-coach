@@ -16,6 +16,9 @@ import {
 } from '../core/bankMode';
 import { inventoryImage, readBriefing, type BossNotes } from '../core/briefing';
 import { readState, type LiveState } from '../core/liveState';
+import {
+  checkProfile, readProfile, viewProfile, writeProfile,
+} from '../core/playerProfile';
 import { createIconCache } from './icons';
 
 export interface UiServerOptions {
@@ -29,6 +32,8 @@ export interface UiServerOptions {
   iconCacheDir: string;
   /** The Boss notes folder (repo `boss-notes/`), read by the Briefing endpoint. */
   bossNotesDir: string;
+  /** The Player profile file (the app passes `~/.osrs-pvm-coach/profile.json`, outside the repo). */
+  profileFile: string;
   /** The wiki fetch. Tests replace it; the app uses the global `fetch`. */
   fetchIcon?: typeof fetch;
 }
@@ -82,6 +87,10 @@ const SERVER_LIMITS = {
   maxHeaderSize: 8192, headersTimeout: 10_000, requestTimeout: 10_000, keepAliveTimeout: 5_000, connectionsCheckingInterval: 5_000,
 };
 const MAX_CONNECTIONS = 32;
+/** The one route that takes a write (ticket #79): the Player profile, by PUT. */
+const PROFILE_PATH = '/api/profile';
+/** A profile of 200 Goals is about 25 KiB. */
+const MAX_BODY_BYTES = 64 * 1024;
 
 /** An error whose message is safe to send to the page. All other errors become a plain 500. */
 class HttpError extends Error {
@@ -134,6 +143,18 @@ function drainsOf(query: URLSearchParams): DefenceReductions | undefined {
     drains[drain.field] = Number(value);
   }
   return drains;
+}
+
+/** The request body, up to `max` bytes. A longer body is read to its end and refused, so the reply reaches the client. */
+async function readBody(req: IncomingMessage, max: number): Promise<string> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req as AsyncIterable<Buffer>) {
+    size += chunk.length;
+    if (size <= max) chunks.push(chunk);
+  }
+  if (size > max) throw new HttpError(413, 'The body is too large.');
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 function summarize(state: LiveState): StateSummary {
@@ -233,6 +254,16 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
         if (!notes) throw new HttpError(404, 'No Boss notes for this boss yet.');
         return sendJson(res, 200, notes);
       }
+      case PROFILE_PATH: {
+        let profile;
+        try {
+          profile = await readProfile(options.profileFile);
+        } catch (e) {
+          console.error(e);
+          throw new HttpError(500, 'The Player profile file is not readable.');
+        }
+        return sendJson(res, 200, viewProfile(profile));
+      }
       case '/api/monsters': {
         const q = query.get('q') ?? '';
         const hits = q.length < 2 ? [] : searchMonsters(q).slice(0, 50).map(({ name, version }) => ({ name, version }));
@@ -264,14 +295,39 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
     }
   }
 
+  // The server's only write (ticket #79). On top of the Origin/Host guard: an `Origin` is required (a browser
+  // sends one on every cross-origin and every same-origin PUT), and the body is JSON. A cross-site form can send
+  // only text/plain, form-urlencoded or multipart with no preflight; a JSON PUT from another site needs a CORS
+  // preflight, which this server never grants.
+  async function putProfile(req: IncomingMessage, res: ServerResponse) {
+    if (req.headers.origin === undefined) throw new HttpError(403, 'A write needs an Origin header.');
+    const type = (req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
+    if (type !== 'application/json') throw new HttpError(415, 'A write is JSON (Content-Type: application/json).');
+    let body: unknown;
+    try {
+      body = JSON.parse(await readBody(req, MAX_BODY_BYTES));
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      throw new HttpError(400, 'The body is not JSON.');
+    }
+    const checked = checkProfile(body);
+    if (!checked.ok) throw new HttpError(400, `The body is not a Player profile:\n${checked.message}`);
+    await writeProfile(options.profileFile, checked.profile);
+    return sendJson(res, 200, viewProfile(checked.profile));
+  }
+
   const server = createServer(SERVER_LIMITS, (req, res) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
     if (!isOwnPage(req)) return sendJson(res, 403, { error: 'Forbidden.' });
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.setHeader('Allow', 'GET, HEAD');
+    const isProfile = new URL(req.url ?? '/', 'http://local').pathname === PROFILE_PATH;
+    let handle: Promise<unknown>;
+    if (req.method === 'GET' || req.method === 'HEAD') handle = route(req, res);
+    else if (req.method === 'PUT' && isProfile) handle = putProfile(req, res);
+    else {
+      res.setHeader('Allow', isProfile ? 'GET, HEAD, PUT' : 'GET, HEAD');
       return sendJson(res, 405, { error: 'Method not allowed.' });
     }
-    route(req, res).catch((e: unknown) => {
+    handle.catch((e: unknown) => {
       if (!(e instanceof HttpError)) console.error(e);
       if (res.headersSent) res.end();
       else if (e instanceof HttpError) sendJson(res, e.status, { error: e.message });

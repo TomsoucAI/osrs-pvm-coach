@@ -6,5 +6,6 @@ import './styles.css';
 import './shell.css';
 import './pieces.css';
 import './briefing.css';
+import './goals.css';
 
 createRoot(document.getElementById('root')!).render(<StrictMode><Shell /></StrictMode>);

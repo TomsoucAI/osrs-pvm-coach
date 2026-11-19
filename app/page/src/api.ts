@@ -1,6 +1,8 @@
-// The page's only data path: four read-only endpoints of the UI server, and its "changed" event stream.
+// The page's only data path: the UI server's read-only endpoints, its one write (the Player profile), and its
+// "changed" event stream.
 import type { BankModePlan, BoostMode, CombatStyle, Slot } from '../../src/core/bankMode';
 import type { BossNotes } from '../../src/core/briefing';
+import type { PlayerProfile, ProfileView } from '../../src/core/playerProfile';
 import type { StateSummary } from '../../src/ui/server';
 
 export type { BankModePlan, BoostMode, CombatStyle, Slot, StateSummary };
@@ -67,6 +69,29 @@ export async function fetchBriefing(boss: string): Promise<BriefingReply> {
     return { kind: 'error', message: 'The UI server does not answer.' };
   }
 }
+
+export type { Goal, PlayerProfile, ProfileView } from '../../src/core/playerProfile';
+
+/** The Player profile with the dry math done, or an error (a malformed file, a refused write, no server). */
+export type ProfileReply = { kind: 'profile'; view: ProfileView } | { kind: 'error'; message: string };
+
+async function profileReply(request: Promise<Response>): Promise<ProfileReply> {
+  try {
+    const response = await request;
+    if (response.ok) return { kind: 'profile', view: await response.json() as ProfileView };
+    const { error } = await response.json() as { error?: string };
+    return { kind: 'error', message: error ?? `The server answered ${response.status}.` };
+  } catch {
+    return { kind: 'error', message: 'The UI server does not answer.' };
+  }
+}
+
+export const fetchProfile = () => profileReply(fetch('/api/profile'));
+
+/** The UI server's one write: the whole profile replaces the file. The reply is the saved profile, with the dry math. */
+export const saveProfile = (profile: PlayerProfile) => profileReply(fetch('/api/profile', {
+  method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile),
+}));
 
 /** Calls `onChanged` when the state or bank file changed, and `onConnection` when the stream opens or drops. */
 export function subscribe(onChanged: () => void, onConnection: (open: boolean) => void): () => void {

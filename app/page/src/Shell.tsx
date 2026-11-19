@@ -3,6 +3,7 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { App as Gear } from './App';
 import { Briefing } from './Briefing';
+import { Goals } from './Goals';
 
 type Tab = 'gear' | 'briefing' | 'goals';
 
@@ -26,15 +27,6 @@ function tabHref(tab: Tab): string {
   return search ? `?${search}` : window.location.pathname;
 }
 
-function NotBuilt({ name }: { name: string }) {
-  return (
-    <section className="shell-panel">
-      <h2>{name}</h2>
-      <p>Not built yet.</p>
-    </section>
-  );
-}
-
 export function Shell() {
   const [tab, setTab] = useState(tabFromUrl);
 
@@ -56,7 +48,7 @@ export function Shell() {
   let body: ReactNode;
   if (tab === 'gear') body = <Gear />;
   else if (tab === 'briefing') body = <Briefing />;
-  else body = <NotBuilt name="Goals" />;
+  else body = <Goals />;
 
   return (
     <div className="shell">
