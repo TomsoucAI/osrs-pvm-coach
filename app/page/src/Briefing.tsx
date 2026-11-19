@@ -56,9 +56,9 @@ function Hitsplat({ value }: { value: string }) {
   );
 }
 
-/** A fact's text. A gap in the draft ("To confirm…") is marked, so it is never read as a fact. */
+/** A fact's text. Each "To confirm" (a gap in the draft) is marked in place, so it is never read as a fact. */
 function Fact({ text }: { text: string }) {
-  return /to confirm/i.test(text) ? <><span className="br-confirm">to confirm</span>{text}</> : <>{text}</>;
+  return <>{text.split(/(to confirm)/i).map((part, i) => (i % 2 ? <span key={i} className="br-confirm">{part}</span> : part))}</>;
 }
 
 /** Each source of a fact, with its date; two sources that disagree each show what they say. */
@@ -104,7 +104,8 @@ function Scroll({ notes }: { notes: BossNotes }) {
         {notes.status === 'draft' ? ' · Draft notes, not reviewed yet' : ' · Reviewed notes'} · checked on {notes.checkedOn}
       </p>
       {notes.phases.map((p) => (
-        <section key={p.id} id={p.id} className="br-phase">
+        // A Mechanic's id is its deep-link anchor (#slam), so a Phase takes a prefix: Phase and Mechanic ids can be equal.
+        <section key={p.id} id={`phase-${p.id}`} className="br-phase">
           <header className="br-phase-head">
             <h2><span className="br-phase-hp">{p.from}% HP</span> {p.name}</h2>
           </header>

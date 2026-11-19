@@ -51,7 +51,7 @@ export async function fetchBankMode(view: View, controls: Controls): Promise<{ s
   return { summary, plan };
 }
 
-export type { AttackStyle, BossNotes, Mechanic, Phase, Prayer } from '../../src/core/briefing';
+export type { AttackStyle, BossNotes, Mechanic, Prayer } from '../../src/core/briefing';
 
 /** A boss's Briefing: its notes, "no notes" (404), or an error (a malformed file, no server). */
 export type BriefingReply = { kind: 'notes'; notes: BossNotes } | { kind: 'none' } | { kind: 'error'; message: string };

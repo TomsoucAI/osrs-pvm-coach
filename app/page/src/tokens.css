@@ -18,6 +18,8 @@
 
   /* Combat style, a hard rule on every tab: melee red, ranged green, magic blue. */
   --os-melee: #ff4a3d; --os-ranged: #3fd13f; --os-magic: #5aa8ff;
+  /* The hitsplat's red: red appears only inside hitsplats and on melee. */
+  --os-hitsplat: #c8160b;
 
   /* Spacing: multiples of 8px only. */
   --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 32px;

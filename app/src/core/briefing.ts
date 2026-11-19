@@ -113,8 +113,6 @@ const BossNotesSchema = z.strictObject({
 
 export type BossNotes = z.infer<typeof BossNotesSchema>;
 export type Mechanic = BossNotes['mechanics'][number];
-export type Phase = BossNotes['phases'][number];
-export type Clip = Mechanic['clips'][number];
 export type AttackStyle = Mechanic['style'];
 export type Prayer = NonNullable<Mechanic['prayer']>;
 
