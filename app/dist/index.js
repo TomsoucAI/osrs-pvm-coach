@@ -331463,13 +331463,14 @@ function resolvePins(pins, pool) {
   }
   return { pinned, notes };
 }
+var toItem = (o) => ({ id: o.ownedId, name: o.item.name, source: o.source });
 function describe2(template, c, worn, monster) {
   const result = calculate(playerWith(template, c.attack, c.gear, monster, (o) => o.item), monster);
   const { style } = c.attack;
   return {
     items: Object.fromEntries(SLOTS.map((s) => {
       const o = c.gear[s];
-      return [s, o ? { id: o.ownedId, name: o.item.name, source: o.source } : null];
+      return [s, o ? toItem(o) : null];
     })),
     style: `${style.displayNameOverride ?? style.name} (${style.stance})`,
     spell: c.attack.spell?.name ?? null,
@@ -331530,19 +331531,19 @@ function planBankMode(state, request) {
       continue;
     }
     const setups = ranked.map((c) => describe2(template, c, worn, monster)).sort((a, b) => b.dps - a.dps);
-    const within = (maxSwaps, withPins) => {
-      if (withPins === pinned && setups[0].swaps.length <= maxSwaps) return setups[0];
-      const [best] = rank(maxSwaps, withPins);
+    const hasPins = Object.keys(pinned).length > 0;
+    const within = (maxSwaps, usePins) => {
+      if (usePins === hasPins && setups[0].swaps.length <= maxSwaps) return setups[0];
+      const [best] = rank(maxSwaps, usePins ? pinned : {});
       return best ? describe2(template, best, worn, monster) : null;
     };
-    const unpinned = Object.keys(pinned).length ? {} : pinned;
-    const toItem = (o) => ({ id: o.ownedId, name: o.item.name, source: o.source });
     const owned = Object.fromEntries(SLOTS.map((s) => [s, pool[s].filter((o) => s !== "weapon" || attacksFor(combat, [o], state.spellbook).length > 0).map(toItem)]));
     styles[combat] = {
       setups,
       assumed,
       owned,
-      tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS, pinned), wearingNow: within(0, unpinned) }
+      // "Wearing now" is the worn gear as it is: pins do not apply to it.
+      tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS, true), wearingNow: within(0, false) }
     };
   }
   const notes = [...unknownWorn, ...drainNotes, ...pinNotes];

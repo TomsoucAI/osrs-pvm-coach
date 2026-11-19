@@ -481,13 +481,15 @@ function resolvePins(pins: BankModeRequest['pins'], pool: Record<Slot, Owned[]>)
 
 // ---------- plan ----------
 
+const toItem = (o: Owned): SetupItem => ({ id: o.ownedId, name: o.item.name, source: o.source });
+
 function describe(template: Player, c: Candidate, worn: Gear, monster: Monster): Setup {
   const result = calculate(playerWith(template, c.attack, c.gear, monster, (o) => o.item), monster);
   const { style } = c.attack;
   return {
     items: Object.fromEntries(SLOTS.map((s) => {
       const o = c.gear[s];
-      return [s, o ? { id: o.ownedId, name: o.item.name, source: o.source } : null];
+      return [s, o ? toItem(o) : null];
     })) as Record<Slot, SetupItem | null>,
     style: `${style.displayNameOverride ?? style.name} (${style.stance})`,
     spell: c.attack.spell?.name ?? null,
@@ -547,20 +549,24 @@ export function planBankMode(state: LiveState, request: BankModeRequest): BankMo
       continue;
     }
     const setups = ranked.map((c) => describe(template, c, worn, monster)).sort((a, b) => b.dps - a.dps);
-    // The best setup has the fewest swaps of all setups with its DPS: when it fits a tier, it is that tier's answer.
-    const within = (maxSwaps: number, withPins: Pins): Setup | null => {
-      if (withPins === pinned && setups[0].swaps.length <= maxSwaps) return setups[0];
-      const [best] = rank(maxSwaps, withPins);
+    const hasPins = Object.keys(pinned).length > 0;
+    /** The best setup within `maxSwaps`, with the pins or without them. */
+    const within = (maxSwaps: number, usePins: boolean): Setup | null => {
+      // The best setup has the fewest swaps of all setups with its DPS, and it holds the pins:
+      // when it fits a tier with the same pins, it is that tier's answer.
+      if (usePins === hasPins && setups[0].swaps.length <= maxSwaps) return setups[0];
+      const [best] = rank(maxSwaps, usePins ? pinned : {});
       return best ? describe(template, best, worn, monster) : null;
     };
-    // "Wearing now" is the worn gear as it is: pins do not apply to it.
-    const unpinned = Object.keys(pinned).length ? {} : pinned;
-    const toItem = (o: Owned): SetupItem => ({ id: o.ownedId, name: o.item.name, source: o.source });
     const owned = Object.fromEntries(SLOTS.map((s) => [s, pool[s]
       .filter((o) => s !== 'weapon' || attacksFor(combat, [o], state.spellbook).length > 0)
       .map(toItem)])) as Record<Slot, SetupItem[]>;
     styles[combat] = {
-      setups, assumed, owned, tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS, pinned), wearingNow: within(0, unpinned) },
+      setups,
+      assumed,
+      owned,
+      // "Wearing now" is the worn gear as it is: pins do not apply to it.
+      tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS, true), wearingNow: within(0, false) },
     };
   }
 

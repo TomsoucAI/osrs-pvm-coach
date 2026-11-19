@@ -34,7 +34,11 @@ const DRAIN_OPTIONS: { value: string; label: string }[] = [
   ...[1, 2, 3].map((n) => ({ value: `elder:${n}`, label: `${n} Elder maul` })),
   { value: 'dwh:1,elder:1', label: 'Elder maul + DWH' },
 ];
-const START_CONTROLS: Controls = { boosts: 'planned', drains: 'counted', pins: {} };
+const START_CONTROLS: Controls = {
+  boosts: 'planned', drains: 'counted', bgsDamage: 0, pins: {},
+};
+/** The plan endpoint's limit for BGS damage. */
+const MAX_BGS_DAMAGE = 1000;
 
 /** Browser storage, for the recent-boss chips. Reading it can throw (blocked site data): the helper catches that. */
 const browserStorage = () => window.localStorage;
@@ -198,8 +202,14 @@ export function App() {
     setFetchedAt(Date.now());
   }, [view, controls]);
 
+  // One event stream for the page's life: it calls the latest `load`, so a control change does not reconnect it.
+  const loadLatest = useRef(load);
+  loadLatest.current = load;
   useEffect(() => { load(); }, [load]);
-  useEffect(() => subscribe(load, (open) => { setConnected(open); if (open) load(); }), [load]);
+  useEffect(() => subscribe(
+    () => loadLatest.current(),
+    (open) => { setConnected(open); if (open) loadLatest.current(); },
+  ), []);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
@@ -291,6 +301,24 @@ export function App() {
             <select value={controls.drains} onChange={(e) => setControls({ ...controls, drains: e.target.value })} data-testid="drains">
               {DRAIN_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+          </label>
+          <label className="field">
+            <span className="muted">BGS damage</span>
+            <input
+              type="number"
+              min={0}
+              max={MAX_BGS_DAMAGE}
+              step={1}
+              value={controls.bgsDamage}
+              data-testid="bgs"
+              onChange={(e) => {
+                const damage = Math.min(MAX_BGS_DAMAGE, Math.max(0, Math.trunc(Number(e.target.value) || 0)));
+                setControls({ ...controls, bgsDamage: damage });
+              }}
+            />
+            {controls.drains === 'counted' && controls.bgsDamage > 0 && (
+              <span className="muted note">A manual drain replaces the counted drains.</span>
+            )}
             {sameView && (
               <span className="muted note" data-testid="defence">
                 Defence {base}
@@ -357,7 +385,6 @@ export function App() {
             <span className="big gold">{shown ? shown.dps.toFixed(2) : '—'}</span>
           </div>
           <div className="muted">now → {tierInfo.label.toLowerCase()}</div>
-          {summary?.now && 'unavailable' in summary.now && sameView && <p className="muted note">Now: {summary.now.unavailable}</p>}
           {ranked && !dpsNow && <p className="muted note">Now: the worn gear cannot attack with {view.style}.</p>}
           {shown && dpsNow && (
             <div className={swapSlots.size ? 'gold' : 'good'}>
