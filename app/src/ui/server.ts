@@ -9,13 +9,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net';
 import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import {
-  buildPlayer, calculate, findItem, resolveMonster, searchMonsters, SLOTS,
+  findItem, searchMonsters, SLOTS, type DefenceReductions,
 } from '../calc';
 import {
-  combatStyleOf, planBankMode, type CombatStyle, type Slot,
+  planBankMode, type BankModeRequest, type BoostMode, type CombatStyle, type Slot,
 } from '../core/bankMode';
 import { readState, type LiveState } from '../core/liveState';
-import { phaseUnavailable } from '../core/phaseRules';
 import { createIconCache } from './icons';
 
 export interface UiServerOptions {
@@ -37,7 +36,10 @@ export interface UiServer {
   close(): Promise<void>;
 }
 
-/** What the page shows next to the plan: who is logged in, what is worn, and the DPS of the worn setup. */
+/**
+ * What the page shows next to the plan: who is logged in and what is worn.
+ * The DPS of the worn setup comes from the plan's "wearing now" tier, with the plan's boosts and drains.
+ */
 export interface StateSummary {
   loggedIn: boolean;
   playerName: string | null;
@@ -45,11 +47,16 @@ export interface StateSummary {
   worn: Record<Slot, string | null> | null;
   /** The same slots as item ids, for the icons. */
   wornIds: Record<Slot, number | null> | null;
-  /** Null when the request names no monster, or when the player is logged out. */
-  now: { dps: number; maxHit: number; accuracyPct: number; avgTtkSeconds: number | null } | { unavailable: string } | null;
 }
 
 const COMBAT_STYLES: CombatStyle[] = ['melee', 'ranged', 'magic'];
+const BOOST_MODES: BoostMode[] = ['planned', 'live'];
+/** The drains the page can set by hand, with the MCP tool's limits. */
+const DRAINS = {
+  dwh: { field: 'dwhHits', max: 10 },
+  elder: { field: 'elderMaulHits', max: 10 },
+  bgs: { field: 'bgsDamage', max: 1000 },
+} as const;
 const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -85,10 +92,49 @@ function monsterOf(query: URLSearchParams): { name: string; version?: string } |
   return { name, version: query.get('version') ?? undefined };
 }
 
-function summarize(state: LiveState, monsterQuery: { name: string; version?: string } | null): StateSummary {
+/** `boosts=planned|live`. Omitted = planned, as in the MCP tool. */
+function boostsOf(query: URLSearchParams): BoostMode {
+  const boosts = query.get('boosts') ?? 'planned';
+  if (!BOOST_MODES.includes(boosts as BoostMode)) throw new HttpError(400, 'The "boosts" parameter is planned or live.');
+  return boosts as BoostMode;
+}
+
+/** `pins=weapon:4151,neck:6585`: an item id per slot (the page's ‹ › cyclers). */
+function pinsOf(query: URLSearchParams): BankModeRequest['pins'] {
+  const raw = query.get('pins');
+  if (!raw) return undefined;
+  const pins: Partial<Record<Slot, number>> = {};
+  for (const pair of raw.split(',')) {
+    const [slot, id, ...rest] = pair.split(':');
+    if (rest.length || !SLOTS.includes(slot as Slot) || !/^\d{1,9}$/.test(id ?? '')) {
+      throw new HttpError(400, 'The "pins" parameter is slot:itemId pairs, e.g. weapon:4151,neck:6585.');
+    }
+    pins[slot as Slot] = Number(id);
+  }
+  return pins;
+}
+
+/** `drains=dwh:2,elder:1,bgs:30`, or `drains=none`. Omitted = the drains that the plugin counted. A value replaces them. */
+function drainsOf(query: URLSearchParams): DefenceReductions | undefined {
+  const raw = query.get('drains');
+  if (raw === null) return undefined;
+  if (raw === 'none') return {};
+  const drains: DefenceReductions = {};
+  for (const pair of raw.split(',')) {
+    const [name, value, ...rest] = pair.split(':');
+    const drain = DRAINS[name as keyof typeof DRAINS];
+    if (rest.length || !drain || !/^\d{1,4}$/.test(value ?? '') || Number(value) > drain.max) {
+      throw new HttpError(400, 'The "drains" parameter is none, or name:count pairs: dwh (0-10), elder (0-10), bgs (damage, 0-1000).');
+    }
+    drains[drain.field] = Number(value);
+  }
+  return drains;
+}
+
+function summarize(state: LiveState): StateSummary {
   if (!state.loggedIn) {
     return {
-      loggedIn: false, playerName: null, bankAgeMs: state.bank?.ageMs ?? null, worn: null, wornIds: null, now: null,
+      loggedIn: false, playerName: null, bankAgeMs: state.bank?.ageMs ?? null, worn: null, wornIds: null,
     };
   }
   const wornIds = Object.fromEntries(SLOTS.map((slot) => [slot, state.equipment?.[slot] ?? null])) as Record<Slot, number | null>;
@@ -96,25 +142,8 @@ function summarize(state: LiveState, monsterQuery: { name: string; version?: str
     const id = state.equipment?.[slot];
     return [slot, id === null || id === undefined ? null : findItem(id)?.name ?? `Item ${id}`];
   })) as Record<Slot, string | null>;
-
-  let now: StateSummary['now'] = null;
-  if (monsterQuery) {
-    const monster = resolveMonster(monsterQuery);
-    const { player } = buildPlayer(state, monster);
-    const combat = combatStyleOf(player.style);
-    const unavailable = combat && phaseUnavailable(monster, combat);
-    if (unavailable) now = { unavailable };
-    else {
-      const {
-        dps, maxHit, accuracyPct, avgTtkSeconds,
-      } = calculate(player, monster);
-      now = {
-        dps, maxHit, accuracyPct, avgTtkSeconds,
-      };
-    }
-  }
   return {
-    loggedIn: true, playerName: state.playerName ?? null, bankAgeMs: state.bank?.ageMs ?? null, worn, wornIds, now,
+    loggedIn: true, playerName: state.playerName ?? null, bankAgeMs: state.bank?.ageMs ?? null, worn, wornIds,
   };
 }
 
@@ -175,12 +204,15 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
         if (style !== undefined && !COMBAT_STYLES.includes(style as CombatStyle)) {
           throw new HttpError(400, 'The "style" parameter is melee, ranged or magic.');
         }
+        const request: BankModeRequest = {
+          monster, style: style as CombatStyle | undefined, boosts: boostsOf(query), pins: pinsOf(query), drains: drainsOf(query),
+        };
         const state = await readLiveState();
         if (!state.loggedIn) throw new HttpError(409, 'The player is logged out.');
-        return sendJson(res, 200, planBankMode(state, { monster, style: style as CombatStyle | undefined }));
+        return sendJson(res, 200, planBankMode(state, request));
       }
       case '/api/state':
-        return sendJson(res, 200, summarize(await readLiveState(), monsterOf(query)));
+        return sendJson(res, 200, summarize(await readLiveState()));
       case '/api/monsters': {
         const q = query.get('q') ?? '';
         const hits = q.length < 2 ? [] : searchMonsters(q).slice(0, 50).map(({ name, version }) => ({ name, version }));

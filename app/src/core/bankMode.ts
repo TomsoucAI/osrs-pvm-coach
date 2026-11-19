@@ -78,6 +78,8 @@ export type StylePlan = {
   tiers: Tiers;
   /** null in Live mode. */
   assumed: AssumedBoosts | null;
+  /** What each slot's ‹ › cycler offers: the owned items of the slot. For the weapon, only the weapons that attack with this style. */
+  owned: Record<Slot, SetupItem[]>;
 } | { unavailable: string };
 
 export interface BankModeRequest {
@@ -89,6 +91,11 @@ export interface BankModeRequest {
   unlockedPrayers?: string[];
   /** Omitted = the drains that the plugin counted on this monster. A value replaces them. */
   drains?: DefenceReductions;
+  /**
+   * Item ids the player chose per slot (the page's ‹ › cyclers). Each pinned slot holds that item in every setup
+   * and in the 2-swap tier; "wearing now" ignores pins. A pin of an item that is not owned is ignored, with a note.
+   */
+  pins?: Partial<Record<Slot, number>>;
 }
 
 export interface BankModePlan {
@@ -118,6 +125,7 @@ const BLOCKING_ISSUES = new Set<UserIssueType>([
 /** One owned item. `canon` is the engine's base variant: the search evaluates it, the plan shows `item`. */
 interface Owned { ownedId: number; item: EquipmentPiece; canon: EquipmentPiece; source: ItemSource }
 type Gear = Record<Slot, Owned | null>;
+type Pins = Partial<Record<Slot, Owned>>;
 interface Attack { weapon: Owned | null; style: PlayerCombatStyle; spell: Spell | null }
 interface Candidate { attack: Attack; gear: Gear; dps: number; swaps: number }
 
@@ -162,7 +170,7 @@ function collectOwned(state: LiveState) {
 
 // ---------- attacks: weapon + combat style (+ spell) ----------
 
-export function combatStyleOf(style: PlayerCombatStyle): CombatStyle | null {
+function combatStyleOf(style: PlayerCombatStyle): CombatStyle | null {
   if (style.type === 'magic' || style.type === 'ranged') return style.type;
   return style.type === null ? null : 'melee';
 }
@@ -172,10 +180,11 @@ function spellCandidates(spellbook: LiveState['spellbook']): Spell[] {
   return spells.filter((s) => s.spellbook === spellbook && s.max_hit > 0).sort((a, b) => b.max_hit - a.max_hit);
 }
 
-function attacksFor(combat: CombatStyle, weapons: Owned[], spellbook: LiveState['spellbook']): Attack[] {
+/** `weapons` holds `null` for the unarmed attacks. */
+function attacksFor(combat: CombatStyle, weapons: (Owned | null)[], spellbook: LiveState['spellbook']): Attack[] {
   const castable = spellCandidates(spellbook);
   const attacks: Attack[] = [];
-  for (const weapon of [...weapons, null]) {
+  for (const weapon of weapons) {
     const seen = new Set<string>();
     for (const style of getCombatStylesForCategory(weapon?.canon.category ?? EquipmentCategory.UNARMED)) {
       const key = `${style.type}|${style.stance}`;
@@ -247,8 +256,11 @@ function styleStats(owned: Owned | null, style: PlayerCombatStyle): [number, num
  */
 interface SlotItems { fixed: boolean; plain: (Owned | null)[]; named: Owned[] }
 
-function slotItems(slot: Slot, attack: Attack, owned: Owned[], worn: Owned | null): SlotItems {
-  if (slot === 'shield' && attack.weapon?.canon.isTwoHanded) return { fixed: true, plain: [null], named: [] };
+function slotItems(slot: Slot, attack: Attack, owned: Owned[], worn: Owned | null, pin: Owned | undefined): SlotItems {
+  const twoHanded = slot === 'shield' && !!attack.weapon?.canon.isTwoHanded;
+  // A pinned shield cannot go with a two-handed weapon: no item fits, so the attack is skipped.
+  if (pin) return { fixed: true, plain: twoHanded ? [] : [pin], named: [] };
+  if (twoHanded) return { fixed: true, plain: [null], named: [] };
   if (slot === 'ammo') {
     // Ammo counts only for a weapon that fires it. For all other weapons, keep what is worn.
     if (!needsAmmo(attack)) return { fixed: true, plain: [worn], named: [] };
@@ -386,8 +398,10 @@ class TopSetups {
  * the slots not chosen yet hold an upper-bound item, so one engine call bounds a whole branch.
  * `maxSwaps` = the most slots a setup can change from what is worn: a branch that is already over it is skipped.
  */
-function searchAttack(template: Player, attack: Attack, pool: Record<Slot, Owned[]>, worn: Gear, monster: Monster, top: TopSetups, maxSwaps: number) {
-  const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
+function searchAttack(
+  template: Player, attack: Attack, pool: Record<Slot, Owned[]>, worn: Gear, monster: Monster, top: TopSetups, maxSwaps: number, pins: Pins,
+) {
+  const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot], pins[slot]));
   if (slots.some((items) => items.plain.length === 0)) return;
   const effective = effectiveNamed(template, attack, slots, monster);
 
@@ -443,14 +457,31 @@ function searchAttack(template: Player, attack: Attack, pool: Record<Slot, Owned
 
 function rankStyle(
   template: Player, combat: CombatStyle, pool: Record<Slot, Owned[]>, worn: Gear, spellbook: LiveState['spellbook'], monster: Monster,
-  maxSwaps = Infinity,
+  maxSwaps = Infinity, pins: Pins = {},
 ): Candidate[] {
   const top = new TopSetups();
-  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top, maxSwaps);
+  const weapons = pins.weapon ? [pins.weapon] : [...pool.weapon, null];
+  for (const attack of attacksFor(combat, weapons, spellbook)) searchAttack(template, attack, pool, worn, monster, top, maxSwaps, pins);
   return top.ranked();
 }
 
+/** The owned item of each pin. A pin of an item that is not owned, or not for its slot, is left out with a note. */
+function resolvePins(pins: BankModeRequest['pins'], pool: Record<Slot, Owned[]>): { pinned: Pins; notes: string[] } {
+  const pinned: Pins = {};
+  const notes: string[] = [];
+  for (const [slot, id] of Object.entries(pins ?? {}) as [Slot, number][]) {
+    const item = findItem(id);
+    const canonId = item && getCanonicalItem(item).id;
+    const owned = pool[slot]?.find((o) => o.ownedId === id || o.canon.id === canonId);
+    if (owned) pinned[slot] = owned;
+    else notes.push(`Pinned item ${item?.name ?? id} isn't an owned ${slot} item; the pin is ignored.`);
+  }
+  return { pinned, notes };
+}
+
 // ---------- plan ----------
+
+const toItem = (o: Owned): SetupItem => ({ id: o.ownedId, name: o.item.name, source: o.source });
 
 function describe(template: Player, c: Candidate, worn: Gear, monster: Monster): Setup {
   const result = calculate(playerWith(template, c.attack, c.gear, monster, (o) => o.item), monster);
@@ -458,7 +489,7 @@ function describe(template: Player, c: Candidate, worn: Gear, monster: Monster):
   return {
     items: Object.fromEntries(SLOTS.map((s) => {
       const o = c.gear[s];
-      return [s, o ? { id: o.ownedId, name: o.item.name, source: o.source } : null];
+      return [s, o ? toItem(o) : null];
     })) as Record<Slot, SetupItem | null>,
     style: `${style.displayNameOverride ?? style.name} (${style.stance})`,
     spell: c.attack.spell?.name ?? null,
@@ -479,6 +510,7 @@ export function planBankMode(state: LiveState, request: BankModeRequest): BankMo
   const {
     pool, worn, unknownWorn, notEquipment,
   } = collectOwned(state);
+  const { pinned, notes: pinNotes } = resolvePins(request.pins, pool);
   const empty = Object.fromEntries(SLOTS.map((s) => [s, null])) as Record<Slot, null>;
   // Live boosts: levels, prayers and buffs as they are now. Gear, style and spell come from the search.
   const live = buildPlayer(state, monster, { equipment: empty }).player;
@@ -507,25 +539,38 @@ export function planBankMode(state: LiveState, request: BankModeRequest): BankMo
         potions: potions.map(({ name, doses }) => ({ name, doses })),
       };
     }
-    const rank = (maxSwaps?: number) => withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster, maxSwaps));
-    const ranked = rank();
+    const rank = (maxSwaps: number | undefined, withPins: Pins) => withoutAliasScan(
+      () => rankStyle(template, combat, pool, worn, state.spellbook, monster, maxSwaps, withPins),
+    );
+    const ranked = rank(undefined, pinned);
     if (!ranked.length) {
-      styles[combat] = { unavailable: `No owned setup can attack with ${combat}.` };
+      const withPins = Object.keys(pinned).length ? ' with the pinned items' : '';
+      styles[combat] = { unavailable: `No owned setup can attack with ${combat}${withPins}.` };
       continue;
     }
     const setups = ranked.map((c) => describe(template, c, worn, monster)).sort((a, b) => b.dps - a.dps);
-    // The best setup has the fewest swaps of all setups with its DPS: when it fits a tier, it is that tier's answer.
-    const within = (maxSwaps: number): Setup | null => {
-      if (setups[0].swaps.length <= maxSwaps) return setups[0];
-      const [best] = rank(maxSwaps);
+    const hasPins = Object.keys(pinned).length > 0;
+    /** The best setup within `maxSwaps`, with the pins or without them. */
+    const within = (maxSwaps: number, usePins: boolean): Setup | null => {
+      // The best setup has the fewest swaps of all setups with its DPS, and it holds the pins:
+      // when it fits a tier with the same pins, it is that tier's answer.
+      if (usePins === hasPins && setups[0].swaps.length <= maxSwaps) return setups[0];
+      const [best] = rank(maxSwaps, usePins ? pinned : {});
       return best ? describe(template, best, worn, monster) : null;
     };
+    const owned = Object.fromEntries(SLOTS.map((s) => [s, pool[s]
+      .filter((o) => s !== 'weapon' || attacksFor(combat, [o], state.spellbook).length > 0)
+      .map(toItem)])) as Record<Slot, SetupItem[]>;
     styles[combat] = {
-      setups, assumed, tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS), wearingNow: within(0) },
+      setups,
+      assumed,
+      owned,
+      // "Wearing now" is the worn gear as it is: pins do not apply to it.
+      tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS, true), wearingNow: within(0, false) },
     };
   }
 
-  const notes = [...unknownWorn, ...drainNotes];
+  const notes = [...unknownWorn, ...drainNotes, ...pinNotes];
   if (notEquipment) {
     notes.push(`${notEquipment} owned items in the inventory and bank are not equipment in the Wiki calculator's data (supplies, or very new gear); ignored.`);
   }
