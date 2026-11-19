@@ -41,6 +41,9 @@ coverage/
 credentials.properties
 jagex-accounts.dat
 
+# The Player profile lives in ~/.osrs-pvm-coach/: never commit a copy
+profile.json
+
 # Claude Code personal files
 .claude/settings.local.json
 CLAUDE.local.md

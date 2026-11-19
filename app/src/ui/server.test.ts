@@ -1,11 +1,11 @@
 // Seam 2 (UI server): real HTTP against a server on fixture files.
 // Run with: npm run build && node --test dist/ui.test.js
 import { strict as assert } from 'node:assert';
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { request, type IncomingHttpHeaders } from 'node:http';
 import { connect } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 import { planBankMode, type BankModeRequest } from '../core/bankMode';
 import { readState } from '../core/liveState';
@@ -27,10 +27,10 @@ before(async () => {
   const page = join(dir, 'page');
   await cp(join(dir, 'index.html'), join(page, 'index.html'));
   server = await startUiServer({
-    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES, profileFile: join(dir, 'profile.json'),
   });
   loggedOut = await startUiServer({
-    port: 0, stateFile: join(dir, 'logged-out', 'state.json'), bankFile: join(dir, 'logged-out', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
+    port: 0, stateFile: join(dir, 'logged-out', 'state.json'), bankFile: join(dir, 'logged-out', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES, profileFile: join(dir, 'profile.json'),
   });
 });
 
@@ -48,7 +48,7 @@ interface Reply { status: number; headers: IncomingHttpHeaders; body: string }
  * event loop for seconds, so the server's idle-close timer (keepAliveTimeout, 5 s) fires late and resets a reused
  * connection. A browser resends the GET in that case; Node's client does not.
  */
-function send(path: string, opts: { method?: string; headers?: Record<string, string>; on?: UiServer } = {}): Promise<Reply> {
+function send(path: string, opts: { method?: string; headers?: Record<string, string>; body?: string; on?: UiServer } = {}): Promise<Reply> {
   const { port } = opts.on ?? server;
   return new Promise((done, fail) => {
     const req = request({
@@ -60,11 +60,11 @@ function send(path: string, opts: { method?: string; headers?: Record<string, st
       res.on('end', () => done({ status: res.statusCode ?? 0, headers: res.headers, body }));
     });
     req.on('error', fail);
-    req.end();
+    req.end(opts.body);
   });
 }
 
-const PLAN = '/api/plan?monster=Maggot%20King&version=Far';
+const PLAN ='/api/plan?monster=Maggot%20King&version=Far';
 
 /** The core's plan for a request, as the page would read it (JSON), without the bank age (the clock moves). */
 async function corePlan(request: BankModeRequest) {
@@ -203,7 +203,7 @@ test('a change to the bank file pushes a "changed" event', async () => {
 test('with no plugin folder yet, the server starts, answers 503, and pushes once the plugin writes its files', async () => {
   const folder = join(dir, 'not-yet');
   const early = await startUiServer({
-    port: 0, stateFile: join(folder, 'state.json'), bankFile: join(folder, 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
+    port: 0, stateFile: join(folder, 'state.json'), bankFile: join(folder, 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES, profileFile: join(dir, 'profile.json'),
   });
   try {
     const reply = await send('/api/state', { on: early });
@@ -282,7 +282,7 @@ test('static files come from the page folder only', async () => {
 
 test('the built page serves the RuneScape fonts from its own folder, with a font content type', async () => {
   const built = await startUiServer({
-    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: resolve('dist', 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: resolve('dist', 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES, profileFile: join(dir, 'profile.json'),
   });
   try {
     for (const font of ['RuneScape-Plain-12.ttf', 'RuneScape-Bold-12.ttf']) {
@@ -297,7 +297,7 @@ test('the built page serves the RuneScape fonts from its own folder, with a font
 
 test('the built page serves the max-hit hitsplat sprite from its own folder, with an image content type', async () => {
   const built = await startUiServer({
-    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: resolve('dist', 'page'), iconCacheDir: join(dir, 'icons'),
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: resolve('dist', 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES, profileFile: join(dir, 'profile.json'),
   });
   try {
     const reply = await send('/sprites/max-hit-hitsplat.png', { on: built });
@@ -379,7 +379,7 @@ test('a malformed Boss notes file is refused: an error, never the notes', async 
   await cp(NOTES, notesDir, { recursive: true });
   await writeFile(join(notesDir, 'broken-boss.json'), JSON.stringify({ boss: 'Broken Boss', status: 'draft' }));
   const bad = await startUiServer({
-    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: notesDir,
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: notesDir, profileFile: join(dir, 'profile.json'),
   });
   try {
     const reply = await send('/api/briefing?boss=Broken%20Boss', { on: bad });
@@ -399,7 +399,7 @@ test('the Briefing answer is identical with and without a target in the state fi
   const state = JSON.parse(await readFile(join(inFight, 'state.json'), 'utf8'));
   await writeFile(join(inFight, 'state.json'), JSON.stringify({ ...state, target: { id: 15742, name: 'Maggot King' } }));
   const fighting = await startUiServer({
-    port: 0, stateFile: join(inFight, 'state.json'), bankFile: join(inFight, 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
+    port: 0, stateFile: join(inFight, 'state.json'), bankFile: join(inFight, 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES, profileFile: join(dir, 'profile.json'),
   });
   try {
     const calm = await send(BRIEFING);
@@ -448,6 +448,7 @@ async function iconServer(cacheDir: string, fetchIcon: typeof fetch) {
     pageDir: join(dir, 'page'),
     iconCacheDir: cacheDir,
     bossNotesDir: NOTES,
+    profileFile: join(dir, 'profile.json'),
     fetchIcon,
   });
 }
@@ -583,4 +584,215 @@ test('the server binds 127.0.0.1 only: the LAN address refuses the connection', 
     socket.on('error', (e) => done((e as NodeJS.ErrnoException).code ?? 'error'));
   });
   assert.notEqual(outcome, 'connected');
+});
+
+// The Player profile (ticket #79): the Goals and a typed kc, with the dry math done by the server.
+const PROFILE = '/api/profile';
+const FANG = { kind: 'item', boss: 'Maggot King', item: 'Elder venator fang', oneIn: 340, done: false };
+const SQUASHER = { kind: 'combatAchievement', boss: 'Maggot King', name: 'Maggot Squasher', done: false };
+
+/** A server whose Player profile is `file`. */
+async function profileServer(file: string) {
+  return startUiServer({
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES, profileFile: file,
+  });
+}
+
+test('the profile endpoint returns the Goals, the kc and the dry math', async () => {
+  const file = join(dir, 'profile-read', 'profile.json');
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, JSON.stringify({ goals: [FANG, SQUASHER], kc: { 'Maggot King': 300 } }));
+  const on = await profileServer(file);
+  try {
+    const reply = await send(PROFILE, { on });
+
+    assert.equal(reply.status, 200, reply.body);
+    assert.equal(reply.headers['cache-control'], 'no-store');
+    const view = JSON.parse(reply.body);
+    assert.equal(view.accountType, 'unknown');
+    assert.deepEqual(view.kc, { 'Maggot King': 300 });
+    assert.equal(view.goals.length, 2);
+    const fang = view.goals[0];
+    assert.equal(fang.item, 'Elder venator fang');
+    assert.equal(fang.dry.kc, 300);
+    assert.equal(fang.dry.expectedKills, 340);
+    // 1 - (339/340)^300 = 0.5867, worked by hand.
+    assert.ok(Math.abs(fang.dry.chance - 0.5867) < 0.0005, String(fang.dry.chance));
+    assert.equal(view.goals[1].name, 'Maggot Squasher');
+    assert.equal(view.goals[1].dry, undefined);
+  } finally {
+    await on.close();
+  }
+});
+
+test('with no profile file yet, the profile endpoint returns no Goals and no kc', async () => {
+  const on = await profileServer(join(dir, 'profile-none', 'profile.json'));
+  try {
+    const reply = await send(PROFILE, { on });
+
+    assert.equal(reply.status, 200, reply.body);
+    assert.deepEqual(JSON.parse(reply.body), { accountType: 'unknown', kc: {}, goals: [] });
+  } finally {
+    await on.close();
+  }
+});
+
+test('an item Goal with no typed kc has its drop rate but no chance yet', async () => {
+  const file = join(dir, 'profile-no-kc', 'profile.json');
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, JSON.stringify({ goals: [FANG], kc: {} }));
+  const on = await profileServer(file);
+  try {
+    const { goals } = JSON.parse((await send(PROFILE, { on })).body);
+
+    assert.deepEqual(goals[0].dry, { kc: null, expectedKills: 340, chance: null });
+  } finally {
+    await on.close();
+  }
+});
+
+// The UI server's first write: the profile only, from the page's own origin, as checked JSON.
+const ONE_GOAL = { goals: [FANG], kc: { 'Maggot King': 12 } };
+
+/** A server on a profile file that already holds ONE_GOAL, and the file's bytes as they are now. */
+async function savedProfile(name: string) {
+  const file = join(dir, name, 'profile.json');
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, JSON.stringify(ONE_GOAL));
+  const on = await profileServer(file);
+  const origin = `http://127.0.0.1:${on.port}`;
+  const put = (body: unknown, headers: Record<string, string> = { Origin: origin, 'Content-Type': 'application/json' }) => send(PROFILE, {
+    on, method: 'PUT', headers, body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+  return { file, on, origin, put, onDisk: () => readFile(file, 'utf8') };
+}
+
+test('a write from the page\'s origin replaces the profile, returns it with the dry math, and survives a restart', async () => {
+  const { file, on, put } = await savedProfile('profile-write');
+  const next = { goals: [{ ...FANG, done: true }, SQUASHER], kc: { 'Maggot King': 300 } };
+  try {
+    const reply = await put(next);
+
+    assert.equal(reply.status, 200, reply.body);
+    const view = JSON.parse(reply.body);
+    assert.equal(view.goals[0].done, true);
+    assert.equal(view.goals[0].dry.kc, 300);
+    assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), next);
+  } finally {
+    await on.close();
+  }
+  const restarted = await profileServer(file);
+  try {
+    const view = JSON.parse((await send(PROFILE, { on: restarted })).body);
+    assert.deepEqual(view.kc, { 'Maggot King': 300 });
+    assert.deepEqual(view.goals.map((g: { kind: string }) => g.kind), ['item', 'combatAchievement']);
+  } finally {
+    await restarted.close();
+  }
+});
+
+test('a write from a foreign origin gets 403, and the file does not change', async () => {
+  const { on, put, onDisk } = await savedProfile('profile-foreign');
+  const before = await onDisk();
+  try {
+    for (const origin of ['https://evil.example', `http://127.0.0.1:${on.port + 1}`, 'null']) {
+      const reply = await put({ goals: [], kc: {} }, { Origin: origin, 'Content-Type': 'application/json' });
+      assert.equal(reply.status, 403, origin);
+    }
+    assert.equal(await onDisk(), before);
+  } finally {
+    await on.close();
+  }
+});
+
+test('a write with no Origin is refused, and the file does not change', async () => {
+  const { on, put, onDisk } = await savedProfile('profile-no-origin');
+  const before = await onDisk();
+  try {
+    const reply = await put({ goals: [], kc: {} }, { 'Content-Type': 'application/json' });
+
+    assert.equal(reply.status, 403, reply.body);
+    assert.equal(await onDisk(), before);
+  } finally {
+    await on.close();
+  }
+});
+
+test('a write with a content type other than JSON is refused, and the file does not change', async () => {
+  const { on, origin, put, onDisk } = await savedProfile('profile-type');
+  const before = await onDisk();
+  try {
+    // text/plain and form types are what a cross-site form can send with no preflight.
+    for (const type of [undefined, 'text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x', 'application/jsonp']) {
+      const headers: Record<string, string> = { Origin: origin };
+      if (type) headers['Content-Type'] = type;
+      const reply = await put({ goals: [], kc: {} }, headers);
+      assert.equal(reply.status, 415, `${type}: ${reply.body}`);
+    }
+    assert.equal(await onDisk(), before);
+  } finally {
+    await on.close();
+  }
+});
+
+test('a write whose body fails the profile schema is refused with 400, and the file does not change', async () => {
+  const { on, put, onDisk } = await savedProfile('profile-schema');
+  const before = await onDisk();
+  const bad = [
+    '{not json',
+    [],
+    { goals: [] },
+    { goals: [], kc: {}, accountType: 'main' },
+    { goals: [{ ...FANG, oneIn: 0 }], kc: {} },
+    { goals: [{ ...FANG, done: 'yes' }], kc: {} },
+    { goals: [{ kind: 'pet', boss: 'Maggot King', name: 'x', done: false }], kc: {} },
+    { goals: [FANG, FANG], kc: {} },
+    { goals: [], kc: { 'Maggot King': -1 } },
+    { goals: [], kc: { 'Maggot King': 1.5 } },
+  ];
+  try {
+    for (const body of bad) {
+      const reply = await put(body);
+      assert.equal(reply.status, 400, `${JSON.stringify(body)}: ${reply.body}`);
+      assert.equal(typeof JSON.parse(reply.body).error, 'string');
+    }
+    assert.equal(await onDisk(), before);
+  } finally {
+    await on.close();
+  }
+});
+
+test('a write body over the size limit is refused with 413, and the file does not change', async () => {
+  const { on, put, onDisk } = await savedProfile('profile-large');
+  const before = await onDisk();
+  try {
+    const reply = await put({ goals: [], kc: {}, pad: 'x'.repeat(100_000) });
+
+    assert.equal(reply.status, 413, reply.body);
+    assert.equal(await onDisk(), before);
+  } finally {
+    await on.close();
+  }
+});
+
+test('the profile accepts GET, HEAD and PUT only; every other route still refuses a write method', async () => {
+  const { on, origin } = await savedProfile('profile-methods');
+  const headers = { Origin: origin, 'Content-Type': 'application/json' };
+  try {
+    for (const method of ['POST', 'DELETE', 'PATCH']) {
+      const reply = await send(PROFILE, { on, method, headers, body: '{}' });
+      assert.equal(reply.status, 405, `${method} ${PROFILE}`);
+      assert.equal(reply.headers.allow, 'GET, HEAD, PUT');
+    }
+    const routes = ['/', '/index.html', '/api/plan', '/api/state', '/api/briefing?boss=Maggot%20King', '/api/monsters?q=maggot', '/api/icon?id=4151', '/api/events', '/nope'];
+    for (const path of routes) {
+      for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
+        const reply = await send(path, { on, method, headers, body: JSON.stringify(ONE_GOAL) });
+        assert.equal(reply.status, 405, `${method} ${path}`);
+        assert.equal(reply.headers.allow, 'GET, HEAD', `${method} ${path}`);
+      }
+    }
+  } finally {
+    await on.close();
+  }
 });

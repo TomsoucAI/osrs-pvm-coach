@@ -9,7 +9,7 @@ import {
 } from './api';
 
 /** v1 holds one boss. The Gear tab's boss, when it has one, stays the same on this tab. */
-const DEFAULT_BOSS = 'Maggot King';
+export const DEFAULT_BOSS = 'Maggot King';
 
 type Sources = Mechanic['sources'];
 

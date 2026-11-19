@@ -7,6 +7,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { PROFILE_FILE } from './core/playerProfile';
 import { bridgeFile } from './snapshot';
 import { startUiServer } from './ui/server';
 
@@ -29,6 +30,8 @@ try {
     iconCacheDir: join(homedir(), '.osrs-pvm-coach', 'icons'),
     // dist/ui.js → the repo's top-level boss-notes/ folder.
     bossNotesDir: join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'boss-notes'),
+    // The same file in live and fixture mode: the Goals are the player's, not the fixture's.
+    profileFile: PROFILE_FILE,
   });
   console.log(`Bank mode: http://127.0.0.1:${server.port}/  (${values.fixture ? 'fixture' : 'live'}: ${dirname(stateFile)})`);
   console.log('Stop with Ctrl+C.');

@@ -1,0 +1,32 @@
+/* The Goals tab (ticket #79): the prototype's Goals mock. Spacing, type and colours come from tokens.css.
+   Colour jobs: white body, tan labels, orange headings, yellow the numbers. */
+.gl-body {
+  display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: var(--space-2); align-items: start; padding: var(--space-2);
+  font-family: var(--font-plain); font-size: var(--text-body); line-height: 1.5; color: var(--os-white); text-shadow: var(--os-text-shadow);
+}
+.gl-body p { margin: 0; }
+.gl-side, .gl-list, .gl-list section { display: grid; gap: var(--space-2); align-content: start; }
+.gl-kc, .gl-add { display: grid; gap: var(--space-1); }
+
+.gl-head { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; font-size: var(--text-phase); line-height: 1; }
+.gl-head .muted { font-family: var(--font-plain); font-size: var(--text-body); }
+
+.gl-goal { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: start; }
+.gl-goal h3 { margin: 0; font-family: var(--font-bold); font-weight: 400; font-size: var(--text-mechanic); line-height: 1.25; color: var(--os-yellow); }
+.gl-goal.done h3 { color: var(--os-tan); }
+.gl-main { display: grid; gap: var(--space-1); }
+.gl-main b { font-weight: 400; }
+.gl-actions { display: grid; gap: var(--space-1); }
+
+/* The chance by now. Neutral tan on a dark well: red, green and blue mean a combat style on every tab. */
+.gl-chance { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.gl-chance progress {
+  width: 240px; height: 16px; appearance: none; border: 1px solid var(--os-edge-black); background: var(--os-well);
+}
+.gl-chance progress::-webkit-progress-bar { background: var(--os-well); }
+.gl-chance progress::-webkit-progress-value { background: var(--os-tan); }
+.gl-chance progress::-moz-progress-bar { background: var(--os-tan); }
+
+.gl-error { color: var(--os-white); box-shadow: inset 0 0 0 1px var(--os-orange); }
+
+@media (max-width: 900px) { .gl-body { grid-template-columns: 1fr; } }

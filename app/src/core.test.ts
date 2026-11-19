@@ -6,3 +6,4 @@ import './core/bankModeBoosts.test';
 import './core/thrall.test';
 import './core/bankModePins.test';
 import './core/briefing.test';
+import './core/playerProfile.test';

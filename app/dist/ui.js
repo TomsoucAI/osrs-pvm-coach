@@ -20,8 +20,8 @@ var __commonJS = (cb, mod) => function __require2() {
   }
 };
 var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
+  for (var name2 in all)
+    __defProp(target, name2, { get: all[name2], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -2136,9 +2136,9 @@ var require_extension = __commonJS({
   "node_modules/ws/lib/extension.js"(exports, module) {
     "use strict";
     var { tokenChars } = require_validation();
-    function push(dest, name, elem) {
-      if (dest[name] === void 0) dest[name] = [elem];
-      else dest[name].push(elem);
+    function push(dest, name2, elem) {
+      if (dest[name2] === void 0) dest[name2] = [elem];
+      else dest[name2].push(elem);
     }
     function parse3(header) {
       const offers = /* @__PURE__ */ Object.create(null);
@@ -2164,12 +2164,12 @@ var require_extension = __commonJS({
               throw new SyntaxError(`Unexpected character at index ${i}`);
             }
             if (end === -1) end = i;
-            const name = header.slice(start, end);
+            const name2 = header.slice(start, end);
             if (code === 44) {
-              push(offers, name, params);
+              push(offers, name2, params);
               params = /* @__PURE__ */ Object.create(null);
             } else {
-              extensionName = name;
+              extensionName = name2;
             }
             start = end = -1;
           } else {
@@ -4748,24 +4748,16 @@ var require_Sapphire_Glacialis = __commonJS({
 });
 
 // src/ui.ts
-import { homedir as homedir2 } from "node:os";
-import { dirname as dirname2, join as join5, resolve } from "node:path";
+import { homedir as homedir3 } from "node:os";
+import { dirname as dirname3, join as join6, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-// src/snapshot.ts
+// src/core/playerProfile.ts
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
-
-// node_modules/ws/wrapper.mjs
-var import_stream = __toESM(require_stream(), 1);
-var import_extension = __toESM(require_extension(), 1);
-var import_permessage_deflate = __toESM(require_permessage_deflate(), 1);
-var import_receiver = __toESM(require_receiver(), 1);
-var import_sender = __toESM(require_sender(), 1);
-var import_subprotocol = __toESM(require_subprotocol(), 1);
-var import_websocket = __toESM(require_websocket(), 1);
-var import_websocket_server = __toESM(require_websocket_server(), 1);
+import { dirname, join } from "node:path";
 
 // node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -5886,12 +5878,12 @@ function merge(a, b) {
   });
   return clone(a, def);
 }
-function partial(Class2, schema, mask, name = "partial") {
+function partial(Class2, schema, mask, name2 = "partial") {
   const currDef = schema._zod.def;
   const checks = currDef.checks;
   const hasChecks = checks && checks.length > 0;
   if (hasChecks) {
-    throw new Error(`.${name}() cannot be used on object schemas containing refinements`);
+    throw new Error(`.${name2}() cannot be used on object schemas containing refinements`);
   }
   const selected = mask ? new Set(maskedKeys(schema, mask)) : void 0;
   const newShape = {};
@@ -6231,7 +6223,7 @@ function newError(Definition) {
   return new Definition();
 }
 // @__NO_SIDE_EFFECTS__
-function $constructor(name, initializer3, proto, params) {
+function $constructor(name2, initializer3, proto, params) {
   const zodProto = {};
   function Internals(def) {
     this.def = def;
@@ -6249,10 +6241,10 @@ function $constructor(name, initializer3, proto, params) {
       } finally {
         _zodDesc.value = void 0;
       }
-    } else if (inst._zod.traits.has(name)) {
+    } else if (inst._zod.traits.has(name2)) {
       return;
     }
-    inst._zod.traits.add(name);
+    inst._zod.traits.add(name2);
     initializer3(inst, def);
     if (initialized) {
       const own2 = Object.getPrototypeOf(inst);
@@ -6278,7 +6270,7 @@ function $constructor(name, initializer3, proto, params) {
   const Parent = params?.Parent ?? Object;
   class Definition extends Parent {
   }
-  Object.defineProperty(Definition, "name", { value: name });
+  Object.defineProperty(Definition, "name", { value: name2 });
   function _(def) {
     const inst = params?.Parent ? newError(Definition) : this;
     init(inst, def);
@@ -6299,10 +6291,10 @@ function $constructor(name, initializer3, proto, params) {
     value: (inst) => {
       if (params?.Parent && inst instanceof params.Parent)
         return true;
-      return inst?._zod?.traits?.has(name);
+      return inst?._zod?.traits?.has(name2);
     }
   });
-  Object.defineProperty(_, "name", { value: name });
+  Object.defineProperty(_, "name", { value: name2 });
   return _;
 }
 var $brand = /* @__PURE__ */ Symbol("zod_brand");
@@ -6312,8 +6304,8 @@ var $ZodAsyncError = class extends Error {
   }
 };
 var $ZodEncodeError = class extends Error {
-  constructor(name) {
-    super(`Encountered unidirectional transform during encode: ${name}`);
+  constructor(name2) {
+    super(`Encountered unidirectional transform during encode: ${name2}`);
     this.name = "ZodEncodeError";
   }
 };
@@ -17840,13 +17832,13 @@ ${code}
   return fn;
 }
 function addConstant(ctx, value) {
-  for (const [name2, v] of ctx.constants) {
+  for (const [name3, v] of ctx.constants) {
     if (v === value)
-      return name2;
+      return name3;
   }
-  const name = `c${ctx.constantCounter++}`;
-  ctx.constants.set(name, value);
-  return name;
+  const name2 = `c${ctx.constantCounter++}`;
+  ctx.constants.set(name2, value);
+  return name2;
 }
 function addUserConstant(ctx, fn) {
   ctx.definite = false;
@@ -24484,6 +24476,98 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
+// src/core/playerProfile.ts
+var PROFILE_FILE = join(homedir(), ".osrs-pvm-coach", "profile.json");
+var name = external_exports.string().trim().min(1).max(100);
+var Goal = external_exports.discriminatedUnion("kind", [
+  /** An item drop, picked from the boss's Boss notes, with its drop rate: 1 in `oneIn` kills. */
+  external_exports.strictObject({
+    kind: external_exports.literal("item"),
+    boss: name,
+    item: name,
+    oneIn: external_exports.number().min(1).max(1e7),
+    done: external_exports.boolean()
+  }),
+  /** A combat achievement, picked from the boss's Boss notes. The player marks it done by hand (v1). */
+  external_exports.strictObject({
+    kind: external_exports.literal("combatAchievement"),
+    boss: name,
+    name,
+    done: external_exports.boolean()
+  })
+]);
+var PlayerProfileSchema = external_exports.strictObject({
+  goals: external_exports.array(Goal).max(200),
+  /** The kc that the player typed, by boss name. */
+  kc: external_exports.record(name, external_exports.number().int().min(0).max(1e6))
+}).superRefine((profile, ctx) => {
+  const seen = /* @__PURE__ */ new Set();
+  profile.goals.forEach((goal, i) => {
+    const key = JSON.stringify([goal.kind, goal.boss, goal.kind === "item" ? goal.item : goal.name]);
+    if (seen.has(key)) ctx.addIssue({ code: "custom", message: "this Goal is listed twice", path: ["goals", i] });
+    seen.add(key);
+  });
+});
+var EMPTY = { goals: [], kc: {} };
+function dryMath(oneIn, kc) {
+  return { expectedKills: oneIn, chance: 1 - (1 - 1 / oneIn) ** kc };
+}
+function checkProfile(body) {
+  const parsed = PlayerProfileSchema.safeParse(body);
+  return parsed.success ? { ok: true, profile: parsed.data } : { ok: false, message: external_exports.prettifyError(parsed.error) };
+}
+async function readProfile(file2) {
+  let raw;
+  try {
+    raw = await readFile(file2, "utf8");
+  } catch (e) {
+    if (e.code === "ENOENT") return EMPTY;
+    throw e;
+  }
+  const checked = checkProfile(JSON.parse(raw));
+  if (!checked.ok) throw new Error(`Player profile ${file2} is malformed:
+${checked.message}`);
+  return checked.profile;
+}
+async function writeProfile(file2, profile) {
+  await mkdir(dirname(file2), { recursive: true });
+  const temp = `${file2}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temp, `${JSON.stringify(profile, null, 2)}
+`, "utf8");
+    await rename(temp, file2);
+  } catch (e) {
+    await rm(temp, { force: true });
+    throw e;
+  }
+}
+function viewProfile(profile) {
+  return {
+    accountType: "unknown",
+    kc: profile.kc,
+    goals: profile.goals.map((goal) => {
+      if (goal.kind !== "item") return goal;
+      const kc = profile.kc[goal.boss] ?? null;
+      const { expectedKills, chance } = dryMath(goal.oneIn, kc ?? 0);
+      return { ...goal, dry: { kc, expectedKills, chance: kc === null ? null : chance } };
+    })
+  };
+}
+
+// src/snapshot.ts
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
+
+// node_modules/ws/wrapper.mjs
+var import_stream = __toESM(require_stream(), 1);
+var import_extension = __toESM(require_extension(), 1);
+var import_permessage_deflate = __toESM(require_permessage_deflate(), 1);
+var import_receiver = __toESM(require_receiver(), 1);
+var import_sender = __toESM(require_sender(), 1);
+var import_subprotocol = __toESM(require_subprotocol(), 1);
+var import_websocket = __toESM(require_websocket(), 1);
+var import_websocket_server = __toESM(require_websocket_server(), 1);
+
 // src/snapshot.ts
 var countedDrainsSchema = object({
   targetId: number2().int(),
@@ -24491,13 +24575,13 @@ var countedDrainsSchema = object({
   elderMaulHits: number2().int(),
   bgsDamage: number2().int()
 });
-var bridgeFile = () => process.env.DPS_BRIDGE_FILE ?? join(homedir(), ".runelite", "plugin-data", "dps_bridge", "state.json");
+var bridgeFile = () => process.env.DPS_BRIDGE_FILE ?? join2(homedir2(), ".runelite", "plugin-data", "dps_bridge", "state.json");
 
 // src/ui/server.ts
 import { watch } from "node:fs";
-import { readdir as readdir2, readFile as readFile4 } from "node:fs/promises";
+import { readdir as readdir2, readFile as readFile5 } from "node:fs/promises";
 import { createServer } from "node:http";
-import { basename, dirname, extname, join as join4, relative, sep } from "node:path";
+import { basename, dirname as dirname2, extname, join as join5, relative, sep } from "node:path";
 
 // src/calc.ts
 var import_lodash2 = __toESM(require_lodash(), 1);
@@ -25624,8 +25708,8 @@ var spells_default = [
 
 // ../vendor/osrs-dps-calc/src/types/Spell.ts
 var spells = spells_default;
-function spellByName(name) {
-  return spells.find((s) => s.name === name) || null;
+function spellByName(name2) {
+  return spells.find((s) => s.name === name2) || null;
 }
 function isBindSpell(spell) {
   return spell !== null && ["Bind", "Snare", "Entangle"].includes(spell.name);
@@ -327972,11 +328056,11 @@ var aliasToBase = /* @__PURE__ */ new Map();
 for (const [base, variants] of Object.entries(equipmentAliases2)) {
   for (const v of variants) aliasToBase.set(v, Number(base));
 }
-function createEmptyPlayer(name) {
+function createEmptyPlayer(name2) {
   const zero2 = { stab: 0, slash: 0, crush: 0, magic: 0, ranged: 0 };
   return {
     uuid: "live",
-    name,
+    name: name2,
     style: getDefaultCombatStyle("" /* NONE */),
     skills: Object.fromEntries(SKILLS.map((k) => [k, 99])),
     boosts: Object.fromEntries(SKILLS.map((k) => [k, 0])),
@@ -328105,10 +328189,10 @@ function resolveLiveStyle(snap, styles) {
   }
   return styles[visibleIdx];
 }
-function findSpell(name) {
-  const q = norm(name);
+function findSpell(name2) {
+  const q = norm(name2);
   const s = spells.find((sp) => norm(sp.name) === q) ?? spells.find((sp) => norm(sp.name).includes(q));
-  if (!s) throw new Error(`Unknown spell "${name}"`);
+  if (!s) throw new Error(`Unknown spell "${name2}"`);
   return s;
 }
 var toSkills = (m, fallback) => Object.fromEntries(
@@ -328449,11 +328533,11 @@ function phaseUnavailable(monster, style) {
 // src/core/plannedBoosts.ts
 var ALL_PRAYERS = Object.values(Prayer).filter((p) => typeof p === "number");
 function parseUnlocked(names) {
-  return names.map((name) => {
-    const key = name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+  return names.map((name2) => {
+    const key = name2.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
     const prayer = ALL_PRAYERS.find((p) => Prayer[p] === key);
     if (prayer === void 0) {
-      throw new Error(`Unknown unlocked prayer "${name}". Valid: ${ALL_PRAYERS.map((p) => PrayerMap[p].name).join(", ")}`);
+      throw new Error(`Unknown unlocked prayer "${name2}". Valid: ${ALL_PRAYERS.map((p) => PrayerMap[p].name).join(", ")}`);
     }
     return prayer;
   });
@@ -328500,7 +328584,7 @@ function bestOwnedPotions(combat, skills, owned) {
     const index = ids.indexOf(id);
     return index < 0 || quantity <= 0 ? sum2 : sum2 + quantity * (4 - index);
   }, 0);
-  const potions = POTION_ITEMS.map(({ name, engine, ids }) => ({ name, engine, doses: dosesOf(ids) })).filter((p) => p.doses > 0);
+  const potions = POTION_ITEMS.map(({ name: name2, engine, ids }) => ({ name: name2, engine, doses: dosesOf(ids) })).filter((p) => p.doses > 0);
   const boost = (p, skill) => Math.max(0, ...p.engine.map((e) => PotionMap[e].calculateFn(skills)[skill] ?? 0));
   const wanted = STYLE_SKILLS[combat];
   const top = (skill) => Math.max(0, ...potions.map((p) => boost(p, skill)));
@@ -328896,7 +328980,7 @@ function planBankMode(state, request) {
       }).player;
       assumed = {
         prayers: prayers.map((p) => PrayerMap[p].name),
-        potions: potions.map(({ name, doses }) => ({ name, doses }))
+        potions: potions.map(({ name: name2, doses }) => ({ name: name2, doses }))
       };
     }
     const rank = (maxSwaps, withPins) => withoutAliasScan(
@@ -328949,8 +329033,8 @@ function planBankMode(state, request) {
 }
 
 // src/core/briefing.ts
-import { readdir, readFile } from "node:fs/promises";
-import { join as join2 } from "node:path";
+import { readdir, readFile as readFile2 } from "node:fs/promises";
+import { join as join3 } from "node:path";
 var day = external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "a date is YYYY-MM-DD");
 var text = external_exports.string().trim().min(1);
 var percent = external_exports.number().min(0).max(100);
@@ -329056,12 +329140,12 @@ var BossNotesSchema = external_exports.strictObject({
 });
 var fileOf = (boss) => `${boss.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.json`;
 async function noteFiles(notesDir) {
-  return (await readdir(notesDir)).filter((name) => name.endsWith(".json"));
+  return (await readdir(notesDir)).filter((name2) => name2.endsWith(".json"));
 }
 async function load(notesDir, file2) {
   let json2;
   try {
-    json2 = JSON.parse(await readFile(join2(notesDir, file2), "utf8"));
+    json2 = JSON.parse(await readFile2(join3(notesDir, file2), "utf8"));
   } catch (e) {
     throw new Error(`Boss notes ${file2}: not readable JSON (${e.message})`);
   }
@@ -329077,7 +329161,7 @@ async function readBriefing(notesDir, boss) {
 }
 
 // src/core/liveState.ts
-import { readFile as readFile2 } from "node:fs/promises";
+import { readFile as readFile3 } from "node:fs/promises";
 var itemStack = object({ id: number2().int(), quantity: number2().int() });
 var skillMap = partialRecord(
   _enum2(["atk", "str", "def", "ranged", "magic", "prayer", "hp", "mining", "herblore", "farming"]),
@@ -329121,7 +329205,7 @@ var bankFileSchema = object({
 async function readJson(file2) {
   let text2;
   try {
-    text2 = await readFile2(file2, "utf8");
+    text2 = await readFile3(file2, "utf8");
   } catch (e) {
     if (e.code === "ENOENT") return void 0;
     throw e;
@@ -329161,8 +329245,8 @@ ${prettifyError(parsed.error)}`);
 }
 
 // src/ui/icons.ts
-import { mkdir, readFile as readFile3, rename, writeFile } from "node:fs/promises";
-import { join as join3 } from "node:path";
+import { mkdir as mkdir2, readFile as readFile4, rename as rename2, writeFile as writeFile2 } from "node:fs/promises";
+import { join as join4 } from "node:path";
 var WIKI_IMAGES = "https://oldschool.runescape.wiki/images/";
 var USER_AGENT = "osrs-pvm-coach (local item icon cache)";
 var FETCH_TIMEOUT_MS = 5e3;
@@ -329194,10 +329278,10 @@ function createIconCache(dir, fetchIcon) {
       if (!reply.ok || !reply.headers.get("content-type")?.startsWith("image/png")) return "no-icon";
       const body = await readCapped(reply);
       if (!body || !body.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return "no-icon";
-      await mkdir(dir, { recursive: true });
-      const file2 = join3(dir, `${id}.png`);
-      await writeFile(`${file2}.tmp`, body);
-      await rename(`${file2}.tmp`, file2);
+      await mkdir2(dir, { recursive: true });
+      const file2 = join4(dir, `${id}.png`);
+      await writeFile2(`${file2}.tmp`, body);
+      await rename2(`${file2}.tmp`, file2);
       return { icon: body };
     } catch {
       return "retry";
@@ -329207,7 +329291,7 @@ function createIconCache(dir, fetchIcon) {
     async get(itemId) {
       const item = findItem(itemId);
       if (!item?.image) return null;
-      const cached2 = await readFile3(join3(dir, `${item.id}.png`)).catch(() => null);
+      const cached2 = await readFile4(join4(dir, `${item.id}.png`)).catch(() => null);
       if (cached2) return cached2;
       if (noIcon.has(item.id)) return null;
       let job = pending.get(item.id);
@@ -329256,6 +329340,8 @@ var SERVER_LIMITS = {
   connectionsCheckingInterval: 5e3
 };
 var MAX_CONNECTIONS = 32;
+var PROFILE_PATH = "/api/profile";
+var MAX_BODY_BYTES = 64 * 1024;
 var HttpError = class extends Error {
   constructor(status, message) {
     super(message);
@@ -329264,10 +329350,10 @@ var HttpError = class extends Error {
   status;
 };
 function monsterOf(query) {
-  const name = query.get("monster");
-  if (!name) return null;
-  if (!searchMonsters(name).length) throw new HttpError(404, "Monster not found.");
-  return { name, version: query.get("version") ?? void 0 };
+  const name2 = query.get("monster");
+  if (!name2) return null;
+  if (!searchMonsters(name2).length) throw new HttpError(404, "Monster not found.");
+  return { name: name2, version: query.get("version") ?? void 0 };
 }
 function boostsOf(query) {
   const boosts = query.get("boosts") ?? "planned";
@@ -329293,14 +329379,24 @@ function drainsOf(query) {
   if (raw === "none") return {};
   const drains = {};
   for (const pair of raw.split(",")) {
-    const [name, value, ...rest] = pair.split(":");
-    const drain = DRAINS[name];
+    const [name2, value, ...rest] = pair.split(":");
+    const drain = DRAINS[name2];
     if (rest.length || !drain || !/^\d{1,4}$/.test(value ?? "") || Number(value) > drain.max) {
       throw new HttpError(400, 'The "drains" parameter is none, or name:count pairs: dwh (0-10), elder (0-10), bgs (damage, 0-1000).');
     }
     drains[drain.field] = Number(value);
   }
   return drains;
+}
+async function readBody(req, max2) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size <= max2) chunks.push(chunk);
+  }
+  if (size > max2) throw new HttpError(413, "The body is too large.");
+  return Buffer.concat(chunks).toString("utf8");
 }
 function summarize(state) {
   if (!state.loggedIn) {
@@ -329330,7 +329426,7 @@ async function listPage(pageDir) {
   const files = /* @__PURE__ */ new Map();
   for (const entry of entries) {
     if (!entry.isFile()) continue;
-    const file2 = join4(entry.parentPath, entry.name);
+    const file2 = join5(entry.parentPath, entry.name);
     files.set(`/${relative(pageDir, file2).split(sep).join("/")}`, file2);
   }
   const index = files.get("/index.html");
@@ -329397,9 +329493,19 @@ async function startUiServer(options) {
         if (!notes) throw new HttpError(404, "No Boss notes for this boss yet.");
         return sendJson(res, 200, notes);
       }
+      case PROFILE_PATH: {
+        let profile;
+        try {
+          profile = await readProfile(options.profileFile);
+        } catch (e) {
+          console.error(e);
+          throw new HttpError(500, "The Player profile file is malformed.");
+        }
+        return sendJson(res, 200, viewProfile(profile));
+      }
       case "/api/monsters": {
         const q = query.get("q") ?? "";
-        const hits = q.length < 2 ? [] : searchMonsters(q).slice(0, 50).map(({ name, version: version2 }) => ({ name, version: version2 }));
+        const hits = q.length < 2 ? [] : searchMonsters(q).slice(0, 50).map(({ name: name2, version: version2 }) => ({ name: name2, version: version2 }));
         return sendJson(res, 200, hits);
       }
       case "/api/icon": {
@@ -329420,20 +329526,41 @@ async function startUiServer(options) {
       default: {
         const file2 = pageFiles.get(url2.pathname);
         if (!file2) throw new HttpError(404, "Not found.");
-        const body = await readFile4(file2);
+        const body = await readFile5(file2);
         res.writeHead(200, { "Content-Type": CONTENT_TYPES[extname(file2)] ?? "application/octet-stream" });
         return res.end(body);
       }
     }
   }
+  async function putProfile(req, res) {
+    if (req.headers.origin === void 0) throw new HttpError(403, "A write needs an Origin header.");
+    const type = (req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+    if (type !== "application/json") throw new HttpError(415, "A write is JSON (Content-Type: application/json).");
+    let body;
+    try {
+      body = JSON.parse(await readBody(req, MAX_BODY_BYTES));
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      throw new HttpError(400, "The body is not JSON.");
+    }
+    const checked = checkProfile(body);
+    if (!checked.ok) throw new HttpError(400, `The body is not a Player profile:
+${checked.message}`);
+    await writeProfile(options.profileFile, checked.profile);
+    return sendJson(res, 200, viewProfile(checked.profile));
+  }
   const server = createServer(SERVER_LIMITS, (req, res) => {
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
+    for (const [name2, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name2, value);
     if (!isOwnPage(req)) return sendJson(res, 403, { error: "Forbidden." });
-    if (req.method !== "GET" && req.method !== "HEAD") {
-      res.setHeader("Allow", "GET, HEAD");
+    const isProfile = new URL(req.url ?? "/", "http://local").pathname === PROFILE_PATH;
+    let handle;
+    if (req.method === "GET" || req.method === "HEAD") handle = route(req, res);
+    else if (req.method === "PUT" && isProfile) handle = putProfile(req, res);
+    else {
+      res.setHeader("Allow", isProfile ? "GET, HEAD, PUT" : "GET, HEAD");
       return sendJson(res, 405, { error: "Method not allowed." });
     }
-    route(req, res).catch((e) => {
+    handle.catch((e) => {
       if (!(e instanceof HttpError)) console.error(e);
       if (res.headersSent) res.end();
       else if (e instanceof HttpError) sendJson(res, e.status, { error: e.message });
@@ -329469,7 +329596,7 @@ async function startUiServer(options) {
       retry();
     }
   };
-  for (const dir of new Set([options.stateFile, options.bankFile].map((f) => dirname(f)))) watchFolder(dir, false);
+  for (const dir of new Set([options.stateFile, options.bankFile].map((f) => dirname2(f)))) watchFolder(dir, false);
   await new Promise((done, fail) => {
     server.once("error", fail);
     server.listen(options.port, "127.0.0.1", () => done());
@@ -329503,13 +329630,15 @@ try {
   const server = await startUiServer({
     port,
     stateFile,
-    bankFile: join5(dirname2(stateFile), "bank.json"),
-    pageDir: join5(dirname2(fileURLToPath(import.meta.url)), "page"),
-    iconCacheDir: join5(homedir2(), ".osrs-pvm-coach", "icons"),
+    bankFile: join6(dirname3(stateFile), "bank.json"),
+    pageDir: join6(dirname3(fileURLToPath(import.meta.url)), "page"),
+    iconCacheDir: join6(homedir3(), ".osrs-pvm-coach", "icons"),
     // dist/ui.js → the repo's top-level boss-notes/ folder.
-    bossNotesDir: join5(dirname2(fileURLToPath(import.meta.url)), "..", "..", "boss-notes")
+    bossNotesDir: join6(dirname3(fileURLToPath(import.meta.url)), "..", "..", "boss-notes"),
+    // The same file in live and fixture mode: the Goals are the player's, not the fixture's.
+    profileFile: PROFILE_FILE
   });
-  console.log(`Bank mode: http://127.0.0.1:${server.port}/  (${values.fixture ? "fixture" : "live"}: ${dirname2(stateFile)})`);
+  console.log(`Bank mode: http://127.0.0.1:${server.port}/  (${values.fixture ? "fixture" : "live"}: ${dirname3(stateFile)})`);
   console.log("Stop with Ctrl+C.");
 } catch (e) {
   console.error(`The UI server did not start: ${e.message}`);
