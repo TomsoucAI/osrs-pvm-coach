@@ -2,7 +2,7 @@
 // right rail = DPS, tiers, thrall line.
 // No inline styles: the server's Content-Security-Policy allows the page's own stylesheet only.
 import {
-  useCallback, useEffect, useRef, useState,
+  useCallback, useEffect, useRef, useState, type ReactNode,
 } from 'react';
 import {
   fetchBankMode, searchMonsters, subscribe,
@@ -10,6 +10,8 @@ import {
   type StateSummary, type Tiers, type View,
 } from './api';
 import { addRecent, loadRecent, saveRecent } from './recentBosses';
+import { duration } from './duration';
+import { MaxHit } from './MaxHit';
 
 const STYLES: CombatStyle[] = ['melee', 'ranged', 'magic'];
 const SLOTS: Slot[] = ['head', 'cape', 'neck', 'ammo', 'weapon', 'body', 'shield', 'legs', 'hands', 'feet', 'ring'];
@@ -155,7 +157,7 @@ function Doll({
   );
 }
 
-function Tile({ label, value }: { label: string; value: string }) {
+function Tile({ label, value }: { label: string; value: ReactNode }) {
   return <div className="tile"><div className="muted">{label}</div><div className="tile-value">{value}</div></div>;
 }
 
@@ -248,7 +250,6 @@ export function App() {
   return (
     <div className={`page ${live ? '' : 'offline'}`}>
       <header className="status">
-        <h1>Bank mode</h1>
         <span className="grow" />
         {summary?.playerName && <span className="muted">{summary.playerName}</span>}
         <span className={`chip ${live ? 'live' : ''}`} data-testid="live-chip">{live ? '● live' : '○ offline'}</span>
@@ -278,7 +279,7 @@ export function App() {
             <span className="muted">Style</span>
             <div className="segmented">
               {STYLES.map((s) => (
-                <button key={s} type="button" className={`btn ${s === view.style ? 'on' : ''}`} onClick={() => show({ ...view, style: s })}>{s}</button>
+                <button key={s} type="button" className={`btn style-${s} ${s === view.style ? 'on' : ''}`} onClick={() => show({ ...view, style: s })}>{s}</button>
               ))}
             </div>
           </div>
@@ -355,7 +356,7 @@ export function App() {
 
               {shown && (
                 <section className="panel">
-                  <h2>Setup · {shown.style}{shown.spell ? ` · ${shown.spell}` : ''}</h2>
+                  <h2>Setup · <span className={`style-${view.style}`}>{shown.style}{shown.spell ? ` · ${shown.spell}` : ''}</span></h2>
                   <table>
                     <thead><tr><th>Slot</th><th>Wearing now</th><th /><th>{tierInfo.label}</th><th>Where</th></tr></thead>
                     <tbody>
@@ -392,9 +393,9 @@ export function App() {
             </div>
           )}
           <div className="tiles">
-            <Tile label="Max hit" value={shown ? String(shown.maxHit) : '—'} />
+            <Tile label="Max hit" value={shown ? <MaxHit value={shown.maxHit} /> : '—'} />
             <Tile label="Accuracy" value={shown ? `${shown.accuracyPct.toFixed(1)}%` : '—'} />
-            <Tile label="Time to kill" value={shown?.avgTtkSeconds != null ? `${shown.avgTtkSeconds.toFixed(0)} s` : '—'} />
+            <Tile label="Time to kill" value={shown?.avgTtkSeconds != null ? duration(shown.avgTtkSeconds) : '—'} />
           </div>
           {sameView && plan.thrall && (
             <p className="thrall" data-testid="thrall">

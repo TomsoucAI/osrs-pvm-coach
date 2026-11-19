@@ -1,88 +1,114 @@
-/* Colours and paperdoll sizes come from prototype B (branch prototype/bank-mode). */
-:root {
-  --bg: #1b1712; --panel: #26201a; --panel2: #2f281f; --line: #4a3f31; --text: #eadfc8;
-  --muted: #a99a80; --gold: #e0b44c; --good: #6fcf6f; --bad: #e0705a;
-}
+/* The Gear tab: the bank-mode page of #9 in the game's look (spec #72, from prototype commit d976b26).
+   Colours, spacing and type come from tokens.css; only the bevel gradients are local.
+   Colour jobs: white body, tan labels, orange headings, yellow the name and the selection.
+   The pixel font is sharp only at 16px and 32px, so every text is 16px except the big numbers. */
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", sans-serif; }
-button, select, input { font: inherit; color: inherit; }
-h1 { font-size: 18px; margin: 0; color: var(--gold); }
-h2 { font-size: 13px; margin: 0 0 8px; color: var(--gold); text-transform: uppercase; letter-spacing: .06em; }
+body { margin: 0; background: var(--os-backdrop); }
+button, select, input { font: inherit; color: inherit; text-shadow: inherit; }
+h2 { font-family: var(--font-bold); font-weight: 400; font-size: var(--text-body); margin: 0 0 var(--space-1); color: var(--os-orange); }
 
-.page { max-width: 1280px; margin: 0 auto; padding: 16px; }
-.status { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.grow { flex: 1; }
-.columns { display: grid; grid-template-columns: 220px minmax(0, 1fr) 250px; gap: 12px; align-items: start; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
-.data { display: grid; gap: 12px; }
-.rail { display: grid; gap: 12px; }
-
-.muted { color: var(--muted); }
-.gold { color: var(--gold); }
-.good { color: var(--good); }
-.bad { color: var(--bad); }
-.big { font-size: 28px; font-weight: 700; }
-.note { margin: 8px 0 0; font-size: 12px; }
-
-.chip { padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); font-size: 12px; }
-.chip.live { color: var(--good); border-color: var(--good); }
-
-.field { display: grid; gap: 4px; }
-input, select { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; width: 100%; }
-.btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; cursor: pointer; text-transform: capitalize; }
-.btn:hover { border-color: var(--gold); }
-.btn.on { background: var(--gold); color: var(--bg); border-color: var(--gold); }
-.segmented { display: flex; gap: 4px; }
-.segmented .btn { flex: 1; padding: 4px 2px; }
-.hits { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.hits .btn { width: 100%; text-align: left; text-transform: none; }
-.picked { font-weight: 700; font-size: 16px; }
-
-.dolls { display: flex; gap: 16px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
-.arrow { align-self: center; text-align: center; }
-.doll { display: grid; grid-template-columns: repeat(3, 96px); gap: 6px; justify-content: center; }
-.slot {
-  min-height: 78px; border: 2px solid var(--line); background: var(--panel2); border-radius: 4px; padding: 4px;
-  font-size: 11px; display: flex; flex-direction: column; gap: 2px;
+.page {
+  padding: var(--space-2); font-family: var(--font-plain); font-size: var(--text-body); line-height: 1.5;
+  color: var(--os-white); text-shadow: var(--os-text-shadow);
 }
+.page img { image-rendering: pixelated; }
+.status { display: flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-2); }
+.grow { flex: 1; }
+.columns { display: grid; grid-template-columns: 224px minmax(0, 1fr) 256px; gap: var(--space-2); align-items: start; }
+.panel {
+  background: var(--os-inset); border: 1px solid var(--os-edge-lo); border-radius: 2px; padding: var(--space-2);
+  box-shadow: inset 1px 1px 0 var(--os-edge-black), 1px 1px 0 var(--os-edge-hi);
+}
+.data { display: grid; gap: var(--space-2); }
+.rail { display: grid; gap: var(--space-2); }
+
+.muted { color: var(--os-tan); }
+.gold { color: var(--os-yellow); }
+.good, .bad { color: var(--os-white); }
+.big { font-size: var(--text-phase); line-height: 1; }
+.note { margin: var(--space-1) 0 0; }
+
+.chip { padding: 0 var(--space-1); border-radius: 2px; border: 1px solid var(--os-edge-black); background: var(--os-well); color: var(--os-tan); }
+.chip.live { color: var(--os-white); }
+
+.field { display: grid; gap: var(--space-1); }
+input, select {
+  background: var(--os-field); color: var(--os-yellow); border: 1px solid var(--os-edge-black); border-radius: 0; padding: 4px var(--space-1); width: 100%;
+  box-shadow: inset 1px 1px 0 #000, 1px 1px 0 var(--os-edge-hi);
+}
+/* The game's bevel button, for every button of the tab. */
+.btn, .cycle-btn {
+  background: linear-gradient(#5c5245, #3d352a); color: var(--os-orange); border: 1px solid var(--os-edge-black); border-radius: 2px;
+  box-shadow: inset 1px 1px 0 var(--os-edge-hi); cursor: pointer;
+}
+.btn { padding: 4px 12px; }
+.btn:hover { color: var(--os-white); }
+.btn.on { background: var(--os-well); }
+.segmented { display: flex; gap: 4px; }
+.segmented .btn { flex: 1; padding: 4px 2px; text-transform: capitalize; }
+.hits { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.hits .btn { width: 100%; text-align: left; }
+.picked { color: var(--os-yellow); }
+
+/* Both paperdolls use one slot height, so their rows line up and no text is cut. The two dolls share one grid
+   (subgrid): its five slot rows are 1fr, so every slot takes the height of the tallest slot of either doll.
+   A fixed height cannot do this: a long item name wraps to 5 lines.
+   The panel's bottom padding would be shared out to every 1fr row, so an empty last row (12px + the 4px gap) holds it. */
+.data { container-type: inline-size; }
+.dolls {
+  display: grid; grid-template-columns: repeat(3, auto); grid-template-rows: auto repeat(5, 1fr) 12px;
+  gap: 4px var(--space-2); justify-content: center;
+}
+.dolls > .panel { grid-row: 1 / -1; display: grid; grid-template-rows: subgrid; padding-bottom: 0; }
+.arrow { grid-row: 1 / -1; align-self: center; text-align: center; }
+.arrow .big { color: var(--os-tan); }
+.doll {
+  grid-row: 2 / span 5; display: grid; grid-template-rows: subgrid; grid-template-columns: repeat(3, 104px); gap: 4px; justify-content: center;
+}
+/* Too narrow for side by side: the dolls stack, and each doll keeps one slot height. */
+@container (max-width: 800px) {
+  .dolls { display: flex; flex-direction: column; align-items: center; }
+  .dolls > .panel { display: block; padding-bottom: var(--space-2); }
+  .doll { grid-template-rows: none; grid-auto-rows: 1fr; }
+}
+.slot { background: var(--os-bg); border: 1px solid var(--os-edge-lo); padding: var(--space-1); display: flex; flex-direction: column; }
 .slot.empty { visibility: hidden; }
-.slot.swap { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(224, 180, 76, .2) inset; }
-.slot-key { color: var(--muted); font-size: 10px; text-transform: uppercase; }
-.slot-icon { width: 36px; height: 32px; object-fit: contain; image-rendering: pixelated; align-self: center; }
-.slot-name { flex: 1; overflow-wrap: anywhere; }
-.badge { align-self: flex-start; font-size: 10px; padding: 0 5px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); }
-.badge.bank { color: var(--gold); border-color: var(--gold); }
-.badge.inventory { color: var(--good); border-color: var(--good); }
+.slot.swap { border-color: var(--os-yellow); box-shadow: 0 0 0 1px var(--os-yellow) inset; }
+.slot-key { color: var(--os-tan); text-transform: capitalize; }
+.slot-icon { width: 36px; height: 32px; object-fit: contain; align-self: center; }
+.slot-name { overflow-wrap: anywhere; }
+.badge { margin-top: auto; color: var(--os-tan); }
 
 table { border-collapse: collapse; width: 100%; }
-td, th { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; }
-th { color: var(--muted); font-weight: 600; font-size: 12px; }
-.swap-row { background: rgba(224, 180, 76, .12); }
+td, th { padding: var(--space-1); border-bottom: 1px solid var(--os-edge-lo); text-align: left; }
+th { color: var(--os-orange); font-weight: 400; }
+.swap-row { background: rgba(255, 255, 0, .08); }
 
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.tile { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 6px; font-size: 11px; }
-.tile-value { font-size: 16px; font-weight: 700; color: var(--text); }
+.hero .big { color: var(--os-white); }
+.hero .big.gold { color: var(--os-yellow); }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-1); }
+.tile { background: var(--os-well); border: 1px solid var(--os-edge-black); padding: var(--space-1); display: grid; align-content: start; }
+.tile-value { color: var(--os-yellow); }
 
 .slot.pinned { border-style: dashed; }
-.cycle { display: flex; justify-content: space-between; gap: 2px; }
-.cycle-btn { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 0 6px; cursor: pointer; line-height: 16px; }
-.cycle-btn:hover:not(:disabled) { border-color: var(--gold); }
+.cycle { display: flex; justify-content: space-between; gap: 2px; margin-top: 4px; }
+.cycle-btn { padding: 0 6px; line-height: 1.25; }
+.cycle-btn:hover:not(:disabled) { color: var(--os-white); }
 .cycle-btn:disabled { opacity: .3; cursor: default; }
-.reset-pins { float: right; padding: 0 6px; font-size: 11px; text-transform: none; }
+.reset-pins { float: right; padding: 0 6px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.chip-btn { padding: 1px 8px; border-radius: 10px; font-size: 12px; text-transform: none; }
+.chip-btn { padding: 0 var(--space-1); }
 
-.thrall { margin: 0; font-size: 13px; }
-.tier-cards { display: grid; gap: 6px; }
+.thrall { margin: 0; }
+.tier-cards { display: grid; gap: var(--space-1); }
 .tier-card {
-  display: grid; grid-template-columns: 1fr auto; gap: 0 8px; text-align: left; cursor: pointer;
-  background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px;
+  display: grid; grid-template-columns: 1fr auto; gap: 0 var(--space-1); text-align: left; cursor: pointer;
+  background: var(--os-well); border: 1px solid var(--os-edge-black); padding: var(--space-1);
 }
-.tier-card:hover { border-color: var(--gold); }
-.tier-card.on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
-.tier-label { font-weight: 700; }
-.tier-dps { font-weight: 700; color: var(--gold); grid-row: span 2; align-self: center; font-size: 16px; }
+.tier-card:hover .tier-label { color: var(--os-white); }
+.tier-label { color: var(--os-orange); }
+.tier-dps { color: var(--os-yellow); grid-row: span 2; align-self: center; }
 
 /* Offline: the last known data stays on screen, greyed, so stale numbers are not trusted by mistake. */
 .offline .data { filter: grayscale(1); opacity: .45; }

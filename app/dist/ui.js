@@ -315726,7 +315726,8 @@ var CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
-  ".ttf": "font/ttf"
+  ".ttf": "font/ttf",
+  ".png": "image/png"
 };
 var CHANGE_DEBOUNCE_MS = 100;
 var WATCH_RETRY_MS = 1e3;
