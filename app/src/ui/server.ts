@@ -9,13 +9,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net';
 import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import {
-  buildPlayer, calculate, findItem, resolveMonster, searchMonsters, SLOTS, type DefenceReductions,
+  findItem, searchMonsters, SLOTS, type DefenceReductions,
 } from '../calc';
 import {
-  combatStyleOf, planBankMode, type BankModeRequest, type BoostMode, type CombatStyle, type Slot,
+  planBankMode, type BankModeRequest, type BoostMode, type CombatStyle, type Slot,
 } from '../core/bankMode';
 import { readState, type LiveState } from '../core/liveState';
-import { phaseUnavailable } from '../core/phaseRules';
 import { createIconCache } from './icons';
 
 export interface UiServerOptions {
@@ -37,7 +36,10 @@ export interface UiServer {
   close(): Promise<void>;
 }
 
-/** What the page shows next to the plan: who is logged in, what is worn, and the DPS of the worn setup. */
+/**
+ * What the page shows next to the plan: who is logged in and what is worn.
+ * The DPS of the worn setup comes from the plan's "wearing now" tier, with the plan's boosts and drains.
+ */
 export interface StateSummary {
   loggedIn: boolean;
   playerName: string | null;
@@ -45,8 +47,6 @@ export interface StateSummary {
   worn: Record<Slot, string | null> | null;
   /** The same slots as item ids, for the icons. */
   wornIds: Record<Slot, number | null> | null;
-  /** Null when the request names no monster, or when the player is logged out. */
-  now: { dps: number; maxHit: number; accuracyPct: number; avgTtkSeconds: number | null } | { unavailable: string } | null;
 }
 
 const COMBAT_STYLES: CombatStyle[] = ['melee', 'ranged', 'magic'];
@@ -131,10 +131,10 @@ function drainsOf(query: URLSearchParams): DefenceReductions | undefined {
   return drains;
 }
 
-function summarize(state: LiveState, monsterQuery: { name: string; version?: string } | null): StateSummary {
+function summarize(state: LiveState): StateSummary {
   if (!state.loggedIn) {
     return {
-      loggedIn: false, playerName: null, bankAgeMs: state.bank?.ageMs ?? null, worn: null, wornIds: null, now: null,
+      loggedIn: false, playerName: null, bankAgeMs: state.bank?.ageMs ?? null, worn: null, wornIds: null,
     };
   }
   const wornIds = Object.fromEntries(SLOTS.map((slot) => [slot, state.equipment?.[slot] ?? null])) as Record<Slot, number | null>;
@@ -142,25 +142,8 @@ function summarize(state: LiveState, monsterQuery: { name: string; version?: str
     const id = state.equipment?.[slot];
     return [slot, id === null || id === undefined ? null : findItem(id)?.name ?? `Item ${id}`];
   })) as Record<Slot, string | null>;
-
-  let now: StateSummary['now'] = null;
-  if (monsterQuery) {
-    const monster = resolveMonster(monsterQuery);
-    const { player } = buildPlayer(state, monster);
-    const combat = combatStyleOf(player.style);
-    const unavailable = combat && phaseUnavailable(monster, combat);
-    if (unavailable) now = { unavailable };
-    else {
-      const {
-        dps, maxHit, accuracyPct, avgTtkSeconds,
-      } = calculate(player, monster);
-      now = {
-        dps, maxHit, accuracyPct, avgTtkSeconds,
-      };
-    }
-  }
   return {
-    loggedIn: true, playerName: state.playerName ?? null, bankAgeMs: state.bank?.ageMs ?? null, worn, wornIds, now,
+    loggedIn: true, playerName: state.playerName ?? null, bankAgeMs: state.bank?.ageMs ?? null, worn, wornIds,
   };
 }
 
@@ -229,7 +212,7 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
         return sendJson(res, 200, planBankMode(state, request));
       }
       case '/api/state':
-        return sendJson(res, 200, summarize(await readLiveState(), monsterOf(query)));
+        return sendJson(res, 200, summarize(await readLiveState()));
       case '/api/monsters': {
         const q = query.get('q') ?? '';
         const hits = q.length < 2 ? [] : searchMonsters(q).slice(0, 50).map(({ name, version }) => ({ name, version }));

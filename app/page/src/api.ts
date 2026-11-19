@@ -38,7 +38,7 @@ export async function fetchBankMode(view: View, controls: Controls): Promise<{ s
   const pins = Object.entries(controls.pins).map(([slot, id]) => `${slot}:${id}`).join(',');
   const drains = drainsParam(controls);
   const [summary, plan] = await Promise.all([
-    getJson<StateSummary>('/api/state', monster),
+    getJson<StateSummary>('/api/state', {}),
     getJson<BankModePlan>('/api/plan', {
       ...monster,
       style: view.style,

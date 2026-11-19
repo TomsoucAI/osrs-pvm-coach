@@ -315789,15 +315789,14 @@ function drainsOf(query) {
   }
   return drains;
 }
-function summarize(state, monsterQuery) {
+function summarize(state) {
   if (!state.loggedIn) {
     return {
       loggedIn: false,
       playerName: null,
       bankAgeMs: state.bank?.ageMs ?? null,
       worn: null,
-      wornIds: null,
-      now: null
+      wornIds: null
     };
   }
   const wornIds = Object.fromEntries(SLOTS.map((slot) => [slot, state.equipment?.[slot] ?? null]));
@@ -315805,35 +315804,12 @@ function summarize(state, monsterQuery) {
     const id = state.equipment?.[slot];
     return [slot, id === null || id === void 0 ? null : findItem(id)?.name ?? `Item ${id}`];
   }));
-  let now = null;
-  if (monsterQuery) {
-    const monster = resolveMonster(monsterQuery);
-    const { player } = buildPlayer(state, monster);
-    const combat = combatStyleOf(player.style);
-    const unavailable = combat && phaseUnavailable(monster, combat);
-    if (unavailable) now = { unavailable };
-    else {
-      const {
-        dps,
-        maxHit,
-        accuracyPct,
-        avgTtkSeconds
-      } = calculate(player, monster);
-      now = {
-        dps,
-        maxHit,
-        accuracyPct,
-        avgTtkSeconds
-      };
-    }
-  }
   return {
     loggedIn: true,
     playerName: state.playerName ?? null,
     bankAgeMs: state.bank?.ageMs ?? null,
     worn,
-    wornIds,
-    now
+    wornIds
   };
 }
 async function listPage(pageDir) {
@@ -315894,7 +315870,7 @@ async function startUiServer(options) {
         return sendJson(res, 200, planBankMode(state, request));
       }
       case "/api/state":
-        return sendJson(res, 200, summarize(await readLiveState(), monsterOf(query)));
+        return sendJson(res, 200, summarize(await readLiveState()));
       case "/api/monsters": {
         const q = query.get("q") ?? "";
         const hits = q.length < 2 ? [] : searchMonsters(q).slice(0, 50).map(({ name, version: version2 }) => ({ name, version: version2 }));
