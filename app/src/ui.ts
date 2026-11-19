@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The `ui` entry point: starts the bank-mode page server on 127.0.0.1.
 //   node dist/ui.js                      live: reads the DPS Bridge plugin's files
-//   node dist/ui.js --fixture <dir>      reads <dir>/state.json and <dir>/bank.json
+//   node dist/ui.js --fixture <dir>      reads <dir>/state.json and <dir>/bank.json; Goals go to <dir>/profile.json
 //   node dist/ui.js --port <n>           default 4780
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -30,8 +30,8 @@ try {
     iconCacheDir: join(homedir(), '.osrs-pvm-coach', 'icons'),
     // dist/ui.js → the repo's top-level boss-notes/ folder.
     bossNotesDir: join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'boss-notes'),
-    // The same file in live and fixture mode: the Goals are the player's, not the fixture's.
-    profileFile: PROFILE_FILE,
+    // A fixture run is a sandbox: its Goals stay in the fixture folder (git ignores profile.json), never in the real profile.
+    profileFile: values.fixture ? resolve(values.fixture, 'profile.json') : PROFILE_FILE,
   });
   console.log(`Bank mode: http://127.0.0.1:${server.port}/  (${values.fixture ? 'fixture' : 'live'}: ${dirname(stateFile)})`);
   console.log('Stop with Ctrl+C.');

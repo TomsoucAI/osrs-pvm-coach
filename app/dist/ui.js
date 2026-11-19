@@ -329635,8 +329635,8 @@ try {
     iconCacheDir: join6(homedir3(), ".osrs-pvm-coach", "icons"),
     // dist/ui.js → the repo's top-level boss-notes/ folder.
     bossNotesDir: join6(dirname3(fileURLToPath(import.meta.url)), "..", "..", "boss-notes"),
-    // The same file in live and fixture mode: the Goals are the player's, not the fixture's.
-    profileFile: PROFILE_FILE
+    // A fixture run is a sandbox: its Goals stay in the fixture folder (git ignores profile.json), never in the real profile.
+    profileFile: values.fixture ? resolve(values.fixture, "profile.json") : PROFILE_FILE
   });
   console.log(`Bank mode: http://127.0.0.1:${server.port}/  (${values.fixture ? "fixture" : "live"}: ${dirname3(stateFile)})`);
   console.log("Stop with Ctrl+C.");
