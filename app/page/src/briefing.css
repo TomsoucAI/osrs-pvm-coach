@@ -57,12 +57,13 @@
 .br-line dd { margin: 0; }
 .br-do dd { font-family: var(--font-bold); font-size: var(--text-do); line-height: 1.4; color: var(--os-white); }
 
-/* The game's hitsplat, drawn in CSS: a red splat with a white number. A range is two splats. */
+/* The game's damage hitsplat sprite (OSRS Wiki, Jagex's image: same accepted risk as the item icons), with a white
+   number. The 24x23 sprite draws at 2x, so its pixels stay sharp. A range is two splats. */
 .br-splats { display: inline-flex; align-items: center; vertical-align: middle; margin-right: var(--space-1); }
 .br-splat {
-  display: inline-grid; place-items: center; min-width: 48px; height: 40px; padding: 0 var(--space-1); box-sizing: border-box;
-  background: var(--os-hitsplat); color: var(--os-white); text-shadow: var(--os-text-shadow); font-family: var(--font-bold);
-  clip-path: polygon(50% 0, 62% 14%, 80% 6%, 82% 26%, 100% 30%, 90% 50%, 100% 70%, 82% 74%, 80% 94%, 62% 86%, 50% 100%, 38% 86%, 20% 94%, 18% 74%, 0 70%, 10% 50%, 0 30%, 18% 26%, 20% 6%, 38% 14%);
+  display: inline-grid; place-items: center; width: 48px; height: 46px; box-sizing: border-box;
+  background: url("/sprites/damage-hitsplat.png") center / 100% 100% no-repeat; image-rendering: pixelated;
+  color: var(--os-white); text-shadow: var(--os-text-shadow); font-family: var(--font-bold);
 }
 .br-splat + .br-splat { margin-left: -4px; }
 

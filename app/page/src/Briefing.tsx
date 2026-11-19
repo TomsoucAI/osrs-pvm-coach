@@ -1,7 +1,8 @@
 // The Briefing tab (ticket #76): the fight as one scroll, grouped by Phase, drawn straight from the Boss notes.
 // No AI is in this path. The look is prototype variant D's main column (commit d976b26); the Cheat sheet (ticket 4)
 // and the pinned player, Clips and HP timeline (ticket 5) are not here yet.
-// The page loads nothing from another site: the hitsplat is drawn in CSS and the style icons are inline SVG.
+// The page loads nothing from another site: the hitsplat sprite is served from the page's own folder and the style
+// icons are inline SVG.
 import { useEffect, useState } from 'react';
 import {
   fetchBriefing, type AttackStyle, type BossNotes, type BriefingReply, type Mechanic, type Prayer,
