@@ -1,6 +1,7 @@
 /* The Goals tab (ticket #79): the prototype's Goals mock. Spacing, type and colours come from tokens.css.
    Colour jobs: white body, tan labels, orange headings, yellow the numbers. */
 .gl-body {
+  margin: 0; border: 0; min-width: 0;
   display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: var(--space-2); align-items: start; padding: var(--space-2);
   font-family: var(--font-plain); font-size: var(--text-body); line-height: 1.5; color: var(--os-white); text-shadow: var(--os-text-shadow);
 }

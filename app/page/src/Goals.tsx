@@ -2,7 +2,9 @@
 // A Goal is picked from the boss's Boss notes: an item drop (with its drop rate) or a combat achievement.
 // The server does the dry math; this page only draws it. Account type is "unknown" until the Hiscores reader (ticket 7).
 // The look is the prototype's Goals mock (commit d976b26). No inline styles: the CSP allows the page's own stylesheet only.
-import { useEffect, useState, type FormEvent } from 'react';
+import {
+  useEffect, useRef, useState, type FormEvent,
+} from 'react';
 import {
   fetchBriefing, fetchProfile, saveProfile,
   type BossNotes, type Goal, type PlayerProfile, type ProfileReply, type ProfileView,
@@ -10,6 +12,9 @@ import {
 import { DEFAULT_BOSS } from './Briefing';
 
 type Shown = ProfileView['goals'][number];
+
+/** The profile schema's highest kc. */
+const MAX_KC = 1_000_000;
 
 const count = (n: number) => n.toLocaleString('en');
 const percent = (chance: number) => `${(chance * 100).toFixed(1)}%`;
@@ -28,13 +33,13 @@ function KcField({ boss, kc, onSave }: { boss: string; kc: number | undefined; o
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (/^\d{1,7}$/.test(typed) && Number(typed) !== kc) onSave(Number(typed));
+    if (/^\d{1,7}$/.test(typed) && Number(typed) <= MAX_KC && Number(typed) !== kc) onSave(Number(typed));
   };
   return (
     <form className="gl-kc" onSubmit={submit}>
       <label className="field">
         <span className="muted">Your {boss} kc</span>
-        <input type="number" min="0" max="1000000" step="1" inputMode="numeric" value={typed} placeholder="Type your kc" onChange={(e) => setTyped(e.target.value)} />
+        <input type="number" min="0" max={MAX_KC} step="1" inputMode="numeric" value={typed} placeholder="Type your kc" onChange={(e) => setTyped(e.target.value)} />
       </label>
       <button type="submit" className="btn">Save kc</button>
     </form>
@@ -108,6 +113,10 @@ export function Goals() {
   const [reply, setReply] = useState<ProfileReply | null>(null);
   const [notes, setNotes] = useState<BossNotes | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Each save sends the whole profile, built from the last saved one. One save at a time, so a quick second
+  // change cannot start from a stale profile and undo the first.
+  const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     let current = true;
@@ -122,8 +131,13 @@ export function Goals() {
 
   // Each change saves the whole profile; the page shows what the server saved, with its dry math.
   const save = async (change: (profile: PlayerProfile) => PlayerProfile) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setSaving(true);
     const saved = await saveProfile(profileOf(view, change));
     if (saved.kind === 'profile') { setReply(saved); setSaveError(null); } else setSaveError(saved.message);
+    inFlight.current = false;
+    setSaving(false);
   };
   const items = view.goals.filter((g) => g.kind === 'item');
   const achievements = view.goals.filter((g) => g.kind === 'combatAchievement');
@@ -138,7 +152,8 @@ export function Goals() {
   );
 
   return (
-    <div className="gl-body">
+    // A disabled fieldset disables every control inside it while a save is in flight.
+    <fieldset className="gl-body" disabled={saving}>
       <aside className="gl-side">
         <section className="br-inset">
           <h2>Player profile</h2>
@@ -165,6 +180,6 @@ export function Goals() {
           {achievements.length ? achievements.map(row) : <p className="muted">No combat achievement Goal yet.</p>}
         </section>
       </main>
-    </div>
+    </fieldset>
   );
 }

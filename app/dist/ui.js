@@ -329499,7 +329499,7 @@ async function startUiServer(options) {
           profile = await readProfile(options.profileFile);
         } catch (e) {
           console.error(e);
-          throw new HttpError(500, "The Player profile file is malformed.");
+          throw new HttpError(500, "The Player profile file is not readable.");
         }
         return sendJson(res, 200, viewProfile(profile));
       }
