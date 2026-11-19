@@ -100,6 +100,8 @@ assert.equal(ranged.dps, 4.344);
 assert.deepEqual(ranged.items.weapon, { id: 9185, name: 'Rune crossbow', source: 'inventory' });
 assert.equal(ranged.items.ammo?.source, 'bank');
 assert.ok(far.styles.magic.setups!.length > 0);
+// The page's cycler lists (every owned item per slot) stay out of the tool reply: they would only fill the context.
+assert.ok(!('owned' in far.styles.ranged), 'no cycler lists in the tool reply');
 
 const farMd = await call('osrs_best_owned_setup', { monster: 'Maggot King', monster_version: 'Far' }, fixture);
 const farText = (farMd.content[0] as { text: string }).text;

@@ -303,7 +303,13 @@ Use osrs_search_monsters for the exact monster_version. Prefer monster + monster
     });
     const label = `${plan.monster.name}${plan.monster.version ? ` (${plan.monster.version})` : ''}`;
     const { base, effective } = plan.defence;
-    return reply(a.response_format, { ...plan }, () => [
+    // The page's cycler lists (every owned item per slot) stay out of the reply: they would only fill the context.
+    const styles = Object.fromEntries(Object.entries(plan.styles).map(([style, stylePlan]) => {
+      if ('unavailable' in stylePlan) return [style, stylePlan];
+      const { owned: _owned, ...rest } = stylePlan;
+      return [style, rest];
+    }));
+    return reply(a.response_format, { ...plan, styles }, () => [
       `# Best owned setups vs ${label}`,
       plan.boosts === 'planned'
         ? 'Boosts: Planned (the best unlocked prayer and the best owned potion of each style).'

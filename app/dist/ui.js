@@ -315222,7 +315222,7 @@ function spellCandidates(spellbook) {
 function attacksFor(combat, weapons, spellbook) {
   const castable = spellCandidates(spellbook);
   const attacks = [];
-  for (const weapon of [...weapons, null]) {
+  for (const weapon of weapons) {
     const seen = /* @__PURE__ */ new Set();
     for (const style of getCombatStylesForCategory(weapon?.canon.category ?? "Unarmed" /* UNARMED */)) {
       const key = `${style.type}|${style.stance}`;
@@ -315271,8 +315271,10 @@ function styleStats(owned, style) {
   if (style.type === "ranged") return [offensive.ranged, bonuses.ranged_str];
   return [offensive[style.type], bonuses.str];
 }
-function slotItems(slot, attack, owned, worn) {
-  if (slot === "shield" && attack.weapon?.canon.isTwoHanded) return { fixed: true, plain: [null], named: [] };
+function slotItems(slot, attack, owned, worn, pin) {
+  const twoHanded = slot === "shield" && !!attack.weapon?.canon.isTwoHanded;
+  if (pin) return { fixed: true, plain: twoHanded ? [] : [pin], named: [] };
+  if (twoHanded) return { fixed: true, plain: [null], named: [] };
   if (slot === "ammo") {
     if (!needsAmmo(attack)) return { fixed: true, plain: [worn], named: [] };
     const fits = owned.filter((o) => ammoApplicability(attack.weapon.canon.id, o.canon.id) === 0 /* INCLUDED */);
@@ -315388,8 +315390,8 @@ var TopSetups = class {
     return [...this.byDps.values()].sort((a, b) => b.dps - a.dps);
   }
 };
-function searchAttack(template, attack, pool, worn, monster, top, maxSwaps) {
-  const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot]));
+function searchAttack(template, attack, pool, worn, monster, top, maxSwaps, pins) {
+  const slots = OTHER_SLOTS.map((slot) => slotItems(slot, attack, pool[slot], worn[slot], pins[slot]));
   if (slots.some((items) => items.plain.length === 0)) return;
   const effective = effectiveNamed(template, attack, slots, monster);
   const choices = slots.map((items, i) => {
@@ -315438,10 +315440,23 @@ function searchAttack(template, attack, pool, worn, monster, top, maxSwaps) {
   };
   chooseExact(0, []);
 }
-function rankStyle(template, combat, pool, worn, spellbook, monster, maxSwaps = Infinity) {
+function rankStyle(template, combat, pool, worn, spellbook, monster, maxSwaps = Infinity, pins = {}) {
   const top = new TopSetups();
-  for (const attack of attacksFor(combat, pool.weapon, spellbook)) searchAttack(template, attack, pool, worn, monster, top, maxSwaps);
+  const weapons = pins.weapon ? [pins.weapon] : [...pool.weapon, null];
+  for (const attack of attacksFor(combat, weapons, spellbook)) searchAttack(template, attack, pool, worn, monster, top, maxSwaps, pins);
   return top.ranked();
+}
+function resolvePins(pins, pool) {
+  const pinned = {};
+  const notes = [];
+  for (const [slot, id] of Object.entries(pins ?? {})) {
+    const item = findItem(id);
+    const canonId = item && getCanonicalItem(item).id;
+    const owned = pool[slot]?.find((o) => o.ownedId === id || o.canon.id === canonId);
+    if (owned) pinned[slot] = owned;
+    else notes.push(`Pinned item ${item?.name ?? id} isn't an owned ${slot} item; the pin is ignored.`);
+  }
+  return { pinned, notes };
 }
 function describe2(template, c, worn, monster) {
   const result = calculate(playerWith(template, c.attack, c.gear, monster, (o) => o.item), monster);
@@ -315474,6 +315489,7 @@ function planBankMode(state, request) {
     unknownWorn,
     notEquipment
   } = collectOwned(state);
+  const { pinned, notes: pinNotes } = resolvePins(request.pins, pool);
   const empty2 = Object.fromEntries(SLOTS.map((s) => [s, null]));
   const live = buildPlayer(state, monster, { equipment: empty2 }).player;
   const wanted = request.style ? [request.style] : COMBAT_STYLES;
@@ -315499,25 +315515,32 @@ function planBankMode(state, request) {
         potions: potions.map(({ name, doses }) => ({ name, doses }))
       };
     }
-    const rank = (maxSwaps) => withoutAliasScan(() => rankStyle(template, combat, pool, worn, state.spellbook, monster, maxSwaps));
-    const ranked = rank();
+    const rank = (maxSwaps, withPins) => withoutAliasScan(
+      () => rankStyle(template, combat, pool, worn, state.spellbook, monster, maxSwaps, withPins)
+    );
+    const ranked = rank(void 0, pinned);
     if (!ranked.length) {
-      styles[combat] = { unavailable: `No owned setup can attack with ${combat}.` };
+      const withPins = Object.keys(pinned).length ? " with the pinned items" : "";
+      styles[combat] = { unavailable: `No owned setup can attack with ${combat}${withPins}.` };
       continue;
     }
     const setups = ranked.map((c) => describe2(template, c, worn, monster)).sort((a, b) => b.dps - a.dps);
-    const within = (maxSwaps) => {
-      if (setups[0].swaps.length <= maxSwaps) return setups[0];
-      const [best] = rank(maxSwaps);
+    const within = (maxSwaps, withPins) => {
+      if (withPins === pinned && setups[0].swaps.length <= maxSwaps) return setups[0];
+      const [best] = rank(maxSwaps, withPins);
       return best ? describe2(template, best, worn, monster) : null;
     };
+    const unpinned = Object.keys(pinned).length ? {} : pinned;
+    const toItem = (o) => ({ id: o.ownedId, name: o.item.name, source: o.source });
+    const owned = Object.fromEntries(SLOTS.map((s) => [s, pool[s].filter((o) => s !== "weapon" || attacksFor(combat, [o], state.spellbook).length > 0).map(toItem)]));
     styles[combat] = {
       setups,
       assumed,
-      tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS), wearingNow: within(0) }
+      owned,
+      tiers: { bestOwned: setups[0], upToTwoSwaps: within(TIER_SWAPS, pinned), wearingNow: within(0, unpinned) }
     };
   }
-  const notes = [...unknownWorn, ...drainNotes];
+  const notes = [...unknownWorn, ...drainNotes, ...pinNotes];
   if (notEquipment) {
     notes.push(`${notEquipment} owned items in the inventory and bank are not equipment in the Wiki calculator's data (supplies, or very new gear); ignored.`);
   }
@@ -315692,6 +315715,12 @@ function createIconCache(dir, fetchIcon) {
 
 // src/ui/server.ts
 var COMBAT_STYLES2 = ["melee", "ranged", "magic"];
+var BOOST_MODES = ["planned", "live"];
+var DRAINS = {
+  dwh: { field: "dwhHits", max: 10 },
+  elder: { field: "elderMaulHits", max: 10 },
+  bgs: { field: "bgsDamage", max: 1e3 }
+};
 var CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -315725,6 +315754,39 @@ function monsterOf(query) {
   if (!name) return null;
   if (!searchMonsters(name).length) throw new HttpError(404, "Monster not found.");
   return { name, version: query.get("version") ?? void 0 };
+}
+function boostsOf(query) {
+  const boosts = query.get("boosts") ?? "planned";
+  if (!BOOST_MODES.includes(boosts)) throw new HttpError(400, 'The "boosts" parameter is planned or live.');
+  return boosts;
+}
+function pinsOf(query) {
+  const raw = query.get("pins");
+  if (!raw) return void 0;
+  const pins = {};
+  for (const pair of raw.split(",")) {
+    const [slot, id, ...rest] = pair.split(":");
+    if (rest.length || !SLOTS.includes(slot) || !/^\d{1,9}$/.test(id ?? "")) {
+      throw new HttpError(400, 'The "pins" parameter is slot:itemId pairs, e.g. weapon:4151,neck:6585.');
+    }
+    pins[slot] = Number(id);
+  }
+  return pins;
+}
+function drainsOf(query) {
+  const raw = query.get("drains");
+  if (raw === null) return void 0;
+  if (raw === "none") return {};
+  const drains = {};
+  for (const pair of raw.split(",")) {
+    const [name, value, ...rest] = pair.split(":");
+    const drain = DRAINS[name];
+    if (rest.length || !drain || !/^\d{1,4}$/.test(value ?? "") || Number(value) > drain.max) {
+      throw new HttpError(400, 'The "drains" parameter is none, or name:count pairs: dwh (0-10), elder (0-10), bgs (damage, 0-1000).');
+    }
+    drains[drain.field] = Number(value);
+  }
+  return drains;
 }
 function summarize(state, monsterQuery) {
   if (!state.loggedIn) {
@@ -315819,9 +315881,16 @@ async function startUiServer(options) {
         if (style !== void 0 && !COMBAT_STYLES2.includes(style)) {
           throw new HttpError(400, 'The "style" parameter is melee, ranged or magic.');
         }
+        const request = {
+          monster,
+          style,
+          boosts: boostsOf(query),
+          pins: pinsOf(query),
+          drains: drainsOf(query)
+        };
         const state = await readLiveState();
         if (!state.loggedIn) throw new HttpError(409, "The player is logged out.");
-        return sendJson(res, 200, planBankMode(state, { monster, style }));
+        return sendJson(res, 200, planBankMode(state, request));
       }
       case "/api/state":
         return sendJson(res, 200, summarize(await readLiveState(), monsterOf(query)));

@@ -9,10 +9,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net';
 import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import {
-  buildPlayer, calculate, findItem, resolveMonster, searchMonsters, SLOTS,
+  buildPlayer, calculate, findItem, resolveMonster, searchMonsters, SLOTS, type DefenceReductions,
 } from '../calc';
 import {
-  combatStyleOf, planBankMode, type CombatStyle, type Slot,
+  combatStyleOf, planBankMode, type BankModeRequest, type BoostMode, type CombatStyle, type Slot,
 } from '../core/bankMode';
 import { readState, type LiveState } from '../core/liveState';
 import { phaseUnavailable } from '../core/phaseRules';
@@ -50,6 +50,13 @@ export interface StateSummary {
 }
 
 const COMBAT_STYLES: CombatStyle[] = ['melee', 'ranged', 'magic'];
+const BOOST_MODES: BoostMode[] = ['planned', 'live'];
+/** The drains the page can set by hand, with the MCP tool's limits. */
+const DRAINS = {
+  dwh: { field: 'dwhHits', max: 10 },
+  elder: { field: 'elderMaulHits', max: 10 },
+  bgs: { field: 'bgsDamage', max: 1000 },
+} as const;
 const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -83,6 +90,45 @@ function monsterOf(query: URLSearchParams): { name: string; version?: string } |
   if (!name) return null;
   if (!searchMonsters(name).length) throw new HttpError(404, 'Monster not found.');
   return { name, version: query.get('version') ?? undefined };
+}
+
+/** `boosts=planned|live`. Omitted = planned, as in the MCP tool. */
+function boostsOf(query: URLSearchParams): BoostMode {
+  const boosts = query.get('boosts') ?? 'planned';
+  if (!BOOST_MODES.includes(boosts as BoostMode)) throw new HttpError(400, 'The "boosts" parameter is planned or live.');
+  return boosts as BoostMode;
+}
+
+/** `pins=weapon:4151,neck:6585`: an item id per slot (the page's ‹ › cyclers). */
+function pinsOf(query: URLSearchParams): BankModeRequest['pins'] {
+  const raw = query.get('pins');
+  if (!raw) return undefined;
+  const pins: Partial<Record<Slot, number>> = {};
+  for (const pair of raw.split(',')) {
+    const [slot, id, ...rest] = pair.split(':');
+    if (rest.length || !SLOTS.includes(slot as Slot) || !/^\d{1,9}$/.test(id ?? '')) {
+      throw new HttpError(400, 'The "pins" parameter is slot:itemId pairs, e.g. weapon:4151,neck:6585.');
+    }
+    pins[slot as Slot] = Number(id);
+  }
+  return pins;
+}
+
+/** `drains=dwh:2,elder:1,bgs:30`, or `drains=none`. Omitted = the drains that the plugin counted. A value replaces them. */
+function drainsOf(query: URLSearchParams): DefenceReductions | undefined {
+  const raw = query.get('drains');
+  if (raw === null) return undefined;
+  if (raw === 'none') return {};
+  const drains: DefenceReductions = {};
+  for (const pair of raw.split(',')) {
+    const [name, value, ...rest] = pair.split(':');
+    const drain = DRAINS[name as keyof typeof DRAINS];
+    if (rest.length || !drain || !/^\d{1,4}$/.test(value ?? '') || Number(value) > drain.max) {
+      throw new HttpError(400, 'The "drains" parameter is none, or name:count pairs: dwh (0-10), elder (0-10), bgs (damage, 0-1000).');
+    }
+    drains[drain.field] = Number(value);
+  }
+  return drains;
 }
 
 function summarize(state: LiveState, monsterQuery: { name: string; version?: string } | null): StateSummary {
@@ -175,9 +221,12 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServer>
         if (style !== undefined && !COMBAT_STYLES.includes(style as CombatStyle)) {
           throw new HttpError(400, 'The "style" parameter is melee, ranged or magic.');
         }
+        const request: BankModeRequest = {
+          monster, style: style as CombatStyle | undefined, boosts: boostsOf(query), pins: pinsOf(query), drains: drainsOf(query),
+        };
         const state = await readLiveState();
         if (!state.loggedIn) throw new HttpError(409, 'The player is logged out.');
-        return sendJson(res, 200, planBankMode(state, { monster, style: style as CombatStyle | undefined }));
+        return sendJson(res, 200, planBankMode(state, request));
       }
       case '/api/state':
         return sendJson(res, 200, summarize(await readLiveState(), monsterOf(query)));

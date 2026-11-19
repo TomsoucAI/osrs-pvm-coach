@@ -7,7 +7,7 @@ import { connect } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { after, before, test } from 'node:test';
-import { planBankMode } from '../core/bankMode';
+import { planBankMode, type BankModeRequest } from '../core/bankMode';
 import { readState } from '../core/liveState';
 import { startUiServer, type UiServer } from './server';
 
@@ -59,22 +59,68 @@ function send(path: string, opts: { method?: string; headers?: Record<string, st
 
 const PLAN = '/api/plan?monster=Maggot%20King&version=Far';
 
-test('the plan endpoint returns the core plan', async () => {
+/** The core's plan for a request, as the page would read it (JSON), without the bank age (the clock moves). */
+async function corePlan(request: BankModeRequest) {
   const state = await readState(join(dir, 'fixture', 'state.json'), join(dir, 'fixture', 'bank.json'));
-  const { bankAgeMs: _coreAge, ...core } = planBankMode(state, { monster: { name: 'Maggot King', version: 'Far' } });
+  const { bankAgeMs: _coreAge, ...core } = planBankMode(state, request);
+  return JSON.parse(JSON.stringify(core));
+}
 
-  const reply = await send(PLAN);
-
-  assert.equal(reply.status, 200);
+async function servedPlan(path: string) {
+  const reply = await send(path);
+  assert.equal(reply.status, 200, reply.body);
   const { bankAgeMs, ...served } = JSON.parse(reply.body);
-  assert.deepEqual(served, JSON.parse(JSON.stringify(core)));
   assert.equal(typeof bankAgeMs, 'number');
+  return served;
+}
+
+test('the plan endpoint returns the core plan, with Planned boosts when the request names no boost mode', async () => {
+  const served = await servedPlan(PLAN);
+
+  assert.equal(served.boosts, 'planned');
+  assert.deepEqual(served, await corePlan({ monster: { name: 'Maggot King', version: 'Far' }, boosts: 'planned' }));
 });
 
 test('the plan endpoint takes one style', async () => {
   const reply = await send(`${PLAN}&style=ranged`);
 
   assert.deepEqual(Object.keys(JSON.parse(reply.body).styles), ['ranged']);
+});
+
+const NEARBY_MELEE = '/api/plan?monster=Maggot%20King&version=Nearby&style=melee';
+const NEARBY = { name: 'Maggot King', version: 'Nearby' };
+
+test('boost mode, pins and drains round-trip through the plan endpoint', async () => {
+  const live = await servedPlan(`${NEARBY_MELEE}&boosts=live`);
+  const pinned = await servedPlan(`${NEARBY_MELEE}&boosts=live&pins=weapon:4151,neck:12002`);
+  const drained = await servedPlan(`${NEARBY_MELEE}&boosts=live&drains=dwh:2,elder:1,bgs:30`);
+
+  assert.equal(live.boosts, 'live');
+  assert.deepEqual(live, await corePlan({ monster: NEARBY, style: 'melee', boosts: 'live' }));
+  assert.deepEqual(pinned, await corePlan({
+    monster: NEARBY, style: 'melee', boosts: 'live', pins: { weapon: 4151, neck: 12002 },
+  }));
+  assert.equal(pinned.styles.melee.tiers.bestOwned.items.weapon.name, 'Abyssal whip');
+  assert.deepEqual(drained, await corePlan({
+    monster: NEARBY, style: 'melee', boosts: 'live', drains: { dwhHits: 2, elderMaulHits: 1, bgsDamage: 30 },
+  }));
+  assert.ok(drained.defence.effective < drained.defence.base);
+});
+
+test('"drains=none" replaces the counted drains with no drains', async () => {
+  const served = await servedPlan(`${NEARBY_MELEE}&boosts=live&drains=none`);
+
+  assert.deepEqual(served, await corePlan({
+    monster: NEARBY, style: 'melee', boosts: 'live', drains: {},
+  }));
+});
+
+test('the plan endpoint refuses a boost mode, pin or drain it does not know', async () => {
+  for (const bad of ['boosts=boosted', 'pins=hat:4151', 'pins=weapon:whip', 'pins=weapon', 'drains=dwh:-1', 'drains=claws:2', 'drains=dwh:1.5']) {
+    const reply = await send(`${NEARBY_MELEE}&${bad}`);
+    assert.equal(reply.status, 400, `${bad}: ${reply.body}`);
+    assert.ok(JSON.parse(reply.body).error, bad);
+  }
 });
 
 test('the state summary names the worn items and gives the DPS now against the monster', async () => {
