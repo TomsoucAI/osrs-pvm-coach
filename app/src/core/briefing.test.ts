@@ -129,20 +129,33 @@ test('more than 3 killers is refused: the Cheat sheet holds the top 3', async ()
   await assert.rejects(readBriefing(broken, 'Maggot King'), /killers/);
 });
 
-test('the Maggot King inventory to bring fills the 28 slots, each item with its game id and a source', async () => {
+test('the Maggot King notes hold one inventory per style that the Wiki gives: magic and ranged, 28 slots each', async () => {
   const notes = await readBriefing(NOTES_DIR, 'Maggot King');
 
-  assert.equal(notes?.inventory.items.length, 28);
-  assert.deepEqual(notes?.inventory.items[10], { item: 'Anglerfish', id: 13441 });
-  assert.ok(notes?.inventory.sources.length);
+  assert.deepEqual(Object.keys(notes?.inventory ?? {}).sort(), ['magic', 'ranged']);
+  assert.equal(notes?.inventory.magic?.items.length, 28);
+  assert.equal(notes?.inventory.ranged?.items.length, 28);
+  assert.deepEqual(notes?.inventory.magic?.items[8], { item: 'Eye of Ayak', id: 31113 });
+  assert.deepEqual(notes?.inventory.ranged?.items[8], { item: 'Zaryte crossbow', id: 26374 });
+  assert.ok(notes?.inventory.ranged?.sources.length);
 });
 
 test('an inventory of more than 28 items is refused', async () => {
   const notes = await maggotKing();
-  const inventory = notes.inventory as { items: unknown[] };
+  const inventory = notes.inventory as Record<string, { items: unknown[] }>;
   const broken = await folderWith('big-inventory', 'maggot-king.json', {
-    ...notes, inventory: { ...inventory, items: [...inventory.items, { item: 'Anglerfish', id: 13441 }] },
+    ...notes, inventory: { ...inventory, magic: { ...inventory.magic, items: [...inventory.magic.items, { item: 'Anglerfish', id: 13441 }] } },
   });
 
   await assert.rejects(readBriefing(broken, 'Maggot King'), /inventory/);
+});
+
+test('notes with no inventory for any style are refused, and so is an inventory for a style that does not exist', async () => {
+  const notes = await maggotKing();
+  const inventory = notes.inventory as Record<string, unknown>;
+  const empty = await folderWith('no-inventory', 'maggot-king.json', { ...notes, inventory: {} });
+  const typeless = await folderWith('typeless-inventory', 'maggot-king.json', { ...notes, inventory: { typeless: inventory.magic } });
+
+  await assert.rejects(readBriefing(empty, 'Maggot King'), /inventory/);
+  await assert.rejects(readBriefing(typeless, 'Maggot King'), /typeless/);
 });

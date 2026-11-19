@@ -13,6 +13,16 @@ export const STATIC_CONTROLS: Controls = { boosts: 'planned', drains: 'none', bg
 /** `noBank`: the plan saw no bank snapshot, so it ranked the worn and inventory items only. */
 export type Wear = { kind: 'setup'; setup: Setup; noBank: boolean } | { kind: 'why'; why: string };
 
+/** The style switch's choices, in the Gear tab's order. */
+export const STYLES: CombatStyle[] = ['melee', 'ranged', 'magic'];
+
+/** The style switch's first value: the Gear tab's style when its URL names this boss, else melee (its default). */
+export function startStyle(query: URLSearchParams, boss: string): CombatStyle {
+  const sameBoss = query.get('boss')?.trim().toLowerCase() === boss.toLowerCase();
+  const asked = query.get('style') as CombatStyle;
+  return sameBoss && STYLES.includes(asked) ? asked : 'melee';
+}
+
 /** `fresh` is what `fetchBankMode` gave, or null when it failed (no server). */
 export function wearOf(fresh: { summary: StateSummary | null; plan: BankModePlan | null } | null, style: CombatStyle): Wear {
   if (!fresh?.summary) return { kind: 'why', why: 'No game state yet. Log in with the DPS Bridge plugin on.' };

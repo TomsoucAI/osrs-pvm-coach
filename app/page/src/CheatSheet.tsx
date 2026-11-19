@@ -1,5 +1,6 @@
 // The Cheat sheet at the top of the Briefing (ticket #77): what kills you, what to wear, what to bring.
-// The look is prototype variant D's top panel (commit d976b26).
+// The look is prototype variant D's top panel (commit d976b26). A style switch (melee, ranged, magic) drives both
+// "Wear" and "Bring", so the setup and the inventory are always for the same style.
 //
 // Legality condition (spec #72): the Briefing never reacts to live fight state. So "Wear" asks the plan with no
 // drains (never the drains that the plugin counted in a fight) and Planned boosts (never the live levels), and loads
@@ -11,9 +12,10 @@ import {
 } from './api';
 import { MaxHit } from './MaxHit';
 import { Fact, Hitsplat } from './NotesText';
-import { STATIC_CONTROLS, wearOf, type Wear } from './wear';
+import {
+  startStyle, STATIC_CONTROLS, STYLES, wearOf, type Wear,
+} from './wear';
 
-const STYLES: CombatStyle[] = ['melee', 'ranged', 'magic'];
 /** The game's inventory: 4 × 7 slots. */
 const INVENTORY_SLOTS = 28;
 
@@ -38,31 +40,29 @@ function Killers({ notes }: { notes: BossNotes }) {
 }
 
 /**
- * The plan the Gear tab shows for this boss: the Gear tab's version and style when its URL names this boss, else the
- * boss's first version and melee (the Gear tab's own defaults).
+ * The plan the Gear tab shows for this boss and style: the Gear tab's version when its URL names this boss, else the
+ * boss's first version (the Gear tab's own default).
  */
-async function loadWear(boss: string): Promise<{ wear: Wear; style: CombatStyle }> {
+async function loadWear(boss: string, style: CombatStyle): Promise<Wear> {
   const query = new URLSearchParams(window.location.search);
   const sameBoss = query.get('boss')?.trim().toLowerCase() === boss.toLowerCase();
-  const asked = query.get('style') as CombatStyle;
-  const style = sameBoss && STYLES.includes(asked) ? asked : 'melee';
   const phase = (sameBoss ? query.get('phase') : null)
     ?? (await searchMonsters(boss).catch(() => [])).find((m) => m.name === boss)?.version ?? '';
   const fresh = await fetchBankMode({ boss, phase, style }, STATIC_CONTROLS).catch(() => null);
-  return { wear: wearOf(fresh, style), style };
+  return wearOf(fresh, style);
 }
 
-function WearPanel({ boss }: { boss: string }) {
-  const [loaded, setLoaded] = useState<{ wear: Wear; style: CombatStyle } | null>(null);
+function WearPanel({ boss, style }: { boss: string; style: CombatStyle }) {
+  const [wear, setWear] = useState<Wear | null>(null);
 
   useEffect(() => {
     let current = true;
-    loadWear(boss).then((l) => { if (current) setLoaded(l); });
+    setWear(null);
+    loadWear(boss, style).then((w) => { if (current) setWear(w); });
     return () => { current = false; };
-  }, [boss]);
+  }, [boss, style]);
 
-  if (!loaded) return <p className="cs-why">Loading your setup…</p>;
-  const { wear, style } = loaded;
+  if (!wear) return <p className="cs-why">Loading your setup…</p>;
   if (wear.kind === 'why') return <p className="cs-why">{wear.why}</p>;
   const { setup, noBank } = wear;
   return (
@@ -79,7 +79,6 @@ function WearPanel({ boss }: { boss: string }) {
         })}
       </div>
       <p className="cs-gear-line">
-        <span className={`style-${style}`}>{style}</span>
         <b>{setup.dps.toFixed(2)} DPS</b>
         <MaxHit value={setup.maxHit} />
       </p>
@@ -88,7 +87,8 @@ function WearPanel({ boss }: { boss: string }) {
   );
 }
 
-function Bring({ inventory }: { inventory: BossNotes['inventory'] }) {
+function Bring({ inventory, style }: { inventory: BossNotes['inventory'][CombatStyle]; style: CombatStyle }) {
+  if (!inventory) return <p className="cs-why">The Boss notes give no {style} inventory.</p>;
   const slots = Array.from({ length: INVENTORY_SLOTS }, (_, i) => inventory.items[i] ?? null);
   return (
     <>
@@ -105,19 +105,28 @@ function Bring({ inventory }: { inventory: BossNotes['inventory'] }) {
 }
 
 export function CheatSheet({ notes }: { notes: BossNotes }) {
+  // One style for Wear and Bring, so the setup and the inventory are for the same fight plan.
+  const [style, setStyle] = useState(() => startStyle(new URLSearchParams(window.location.search), notes.boss));
   return (
     <section className="cs br-inset" aria-label="Cheat sheet">
       <div className="cs-part cs-grow">
         <h2>What kills you</h2>
         <Killers notes={notes} />
       </div>
-      <div className="cs-part">
-        <h2>Wear · best you own</h2>
-        <WearPanel boss={notes.boss} />
-      </div>
-      <div className="cs-part">
-        <h2>Bring</h2>
-        <Bring inventory={notes.inventory} />
+      <div className="cs-kit">
+        <div className="segmented" role="group" aria-label="Combat style">
+          {STYLES.map((s) => (
+            <button key={s} type="button" className={`btn style-${s} ${s === style ? 'on' : ''}`} aria-pressed={s === style} onClick={() => setStyle(s)}>{s}</button>
+          ))}
+        </div>
+        <div className="cs-part">
+          <h2>Wear · best you own</h2>
+          <WearPanel boss={notes.boss} style={style} />
+        </div>
+        <div className="cs-part">
+          <h2>Bring</h2>
+          <Bring inventory={notes.inventory[style]} style={style} />
+        </div>
       </div>
     </section>
   );

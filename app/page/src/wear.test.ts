@@ -2,7 +2,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import type { BankModePlan, Setup, StateSummary } from './api';
-import { STATIC_CONTROLS, wearOf } from './wear';
+import { startStyle, STATIC_CONTROLS, wearOf } from './wear';
 
 const SETUP = { dps: 7.5, maxHit: 52 } as Setup;
 const IN: StateSummary = { loggedIn: true, playerName: 'FixtureIron', bankAgeMs: 60_000, worn: null, wornIds: null };
@@ -44,6 +44,16 @@ test('logged in with no plan: the panel says the setup search failed', () => {
 
   assert.equal(wear.kind, 'why');
   assert.match(wear.kind === 'why' ? wear.why : '', /setup search .* failed/);
+});
+
+test('the switch starts on the Gear tab\'s style when its URL names this boss, else on melee', () => {
+  const url = (s: string) => new URLSearchParams(s);
+
+  assert.equal(startStyle(url('boss=Maggot+King&style=ranged'), 'Maggot King'), 'ranged');
+  assert.equal(startStyle(url('boss=maggot+king&style=magic'), 'Maggot King'), 'magic');
+  assert.equal(startStyle(url('boss=Zulrah&style=ranged'), 'Maggot King'), 'melee');
+  assert.equal(startStyle(url('boss=Maggot+King&style=flail'), 'Maggot King'), 'melee');
+  assert.equal(startStyle(url(''), 'Maggot King'), 'melee');
 });
 
 test('the Wear request takes nothing from the fight: no drains, Planned boosts (legality condition)', () => {

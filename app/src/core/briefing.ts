@@ -71,6 +71,12 @@ const Mechanic = z.strictObject({
   ...sourced,
 }).refine(fromTo, FROM_TO);
 
+const Inventory = z.strictObject({
+  note: text,
+  items: z.array(z.strictObject({ item: text, id: z.number().int().positive() })).min(1).max(28),
+  ...sourced,
+});
+
 const BossNotesSchema = z.strictObject({
   boss: text,
   status: z.enum(['draft', 'reviewed']),
@@ -94,20 +100,18 @@ const BossNotesSchema = z.strictObject({
   drops: z.array(z.strictObject({ item: text, oneIn: z.number().min(1), note: text.optional(), ...sourced })).min(1),
   // The Cheat sheet (ticket #77). `killers`: the ids of the Mechanics that kill you most, the worst first.
   killers: z.array(anchor).min(1).max(3),
-  // The inventory to bring, slot by slot as the game draws it (4 × 7). `id` is the game's item id; its icon is the
-  // Wiki image "<item>.png". `note` says which setup it is for.
-  inventory: z.strictObject({
-    note: text,
-    items: z.array(z.strictObject({ item: text, id: z.number().int().positive() })).min(1).max(28),
-    ...sourced,
-  }),
+  // The inventory to bring, one per combat style that a source gives (the Cheat sheet's style switch picks one).
+  // Each is slot by slot as the game draws it (4 × 7). `id` is the game's item id; its icon is the Wiki image
+  // "<item>.png". `note` says which setup it is for.
+  inventory: z.strictObject({ melee: Inventory.optional(), ranged: Inventory.optional(), magic: Inventory.optional() })
+    .refine((byStyle) => Object.keys(byStyle).length > 0, { message: 'the inventory needs at least one combat style' }),
 }).superRefine((notes, ctx) => {
   // Every source that a fact names is listed in the file.
   const check = (refs: z.infer<typeof SourceRef>[], path: (string | number)[]) => refs.forEach(({ ref }, i) => {
     if (!(ref in notes.sources)) ctx.addIssue({ code: 'custom', message: `unknown source "${ref}"`, path: [...path, 'sources', i, 'ref'] });
   });
   check(notes.styles.sources, ['styles']);
-  check(notes.inventory.sources, ['inventory']);
+  for (const [style, inventory] of Object.entries(notes.inventory)) if (inventory) check(inventory.sources, ['inventory', style]);
   // Each killer is a Mechanic of this file, named once.
   notes.killers.forEach((id, i) => {
     if (!notes.mechanics.some((m) => m.id === id)) ctx.addIssue({ code: 'custom', message: `killer "${id}" is no Mechanic of this file`, path: ['killers', i] });
@@ -163,9 +167,9 @@ export async function listBossNotes(notesDir: string): Promise<BossNotes[]> {
   return Promise.all((await noteFiles(notesDir)).map((file) => load(notesDir, file)));
 }
 
-/** The Wiki image of an item that a notes inventory lists ("<item>.png"), or null. A malformed folder gives null. */
+/** The Wiki image of an item that a notes inventory (of any style) lists ("<item>.png"), or null. A malformed folder gives null. */
 export async function inventoryImage(notesDir: string, itemId: number): Promise<string | null> {
   const notes = await listBossNotes(notesDir).catch(() => []);
-  const hit = notes.flatMap((n) => n.inventory.items).find((i) => i.id === itemId);
+  const hit = notes.flatMap((n) => Object.values(n.inventory).flatMap((inventory) => inventory?.items ?? [])).find((i) => i.id === itemId);
   return hit ? `${hit.item}.png` : null;
 }

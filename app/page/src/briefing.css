@@ -78,6 +78,10 @@
 .cs { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
 .cs-part { display: grid; align-content: start; gap: var(--space-1); }
 .cs-grow { flex: 1 1 320px; }
+/* Wear and Bring sit under one style switch: the two always show the same style. */
+.cs-kit { display: flex; flex-wrap: wrap; align-content: start; gap: var(--space-2) var(--space-4); }
+.cs-kit > .segmented { flex-basis: 100%; }
+.cs-kit .btn { text-transform: capitalize; }
 .cs h2 { margin: 0; font-family: var(--font-bold); font-weight: 400; font-size: var(--text-body); color: var(--os-orange); }
 
 .cs-killers { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); counter-reset: killer; }
@@ -106,6 +110,5 @@
 .cs-slot img { width: 36px; height: 32px; object-fit: contain; }
 
 .cs-gear-line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); width: 186px; }
-.cs-gear-line .style-melee, .cs-gear-line .style-ranged, .cs-gear-line .style-magic { text-transform: capitalize; }
 .cs-gear-line b { font-family: var(--font-bold); font-weight: 400; color: var(--os-yellow); }
 .cs-why { max-width: 186px; color: var(--os-tan); }
