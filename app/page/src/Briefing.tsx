@@ -1,12 +1,14 @@
 // The Briefing tab (ticket #76): the fight as one scroll, grouped by Phase, drawn straight from the Boss notes.
-// No AI is in this path. The look is prototype variant D's main column (commit d976b26); the Cheat sheet (ticket 4)
-// and the pinned player, Clips and HP timeline (ticket 5) are not here yet.
+// No AI is in this path. The look is prototype variant D's main column (commit d976b26), with the Cheat sheet on top
+// (ticket #77). The pinned player, Clips and HP timeline (ticket 5) are not here yet.
 // The page loads nothing from another site: the hitsplat sprite is served from the page's own folder and the style
 // icons are inline SVG.
 import { useEffect, useState } from 'react';
 import {
   fetchBriefing, type AttackStyle, type BossNotes, type BriefingReply, type Mechanic, type Prayer,
 } from './api';
+import { CheatSheet } from './CheatSheet';
+import { Fact, Hitsplat } from './NotesText';
 
 /** v1 holds one boss. The Gear tab's boss, when it has one, stays the same on this tab. */
 export const DEFAULT_BOSS = 'Maggot King';
@@ -45,21 +47,6 @@ function PrayerBadge({ prayer }: { prayer?: Prayer }) {
   }
   const { style, name } = PRAYER[prayer];
   return <span className={`br-tag br-${style}`} title={`Protect from ${name}`}><Glyph d={SHIELD} />Protect from {name}</span>;
-}
-
-/** The game's hitsplat. A range ("15–25") shows one splat per number, lowest first. */
-function Hitsplat({ value }: { value: string }) {
-  const parts = value.split('–');
-  return (
-    <span className="br-splats" title={`Damage if you miss it: ${parts.join(' to ')}`}>
-      {parts.map((part) => <span key={part} className="br-splat">{part}</span>)}
-    </span>
-  );
-}
-
-/** A fact's text. Each "To confirm" (a gap in the draft) is marked in place, so it is never read as a fact. */
-function Fact({ text }: { text: string }) {
-  return <>{text.split(/(to confirm)/i).map((part, i) => (i % 2 ? <span key={i} className="br-confirm">{part}</span> : part))}</>;
 }
 
 /** Each source of a fact, with its date; two sources that disagree each show what they say. */
@@ -104,6 +91,7 @@ function Scroll({ notes }: { notes: BossNotes }) {
         <b>{notes.boss}</b>
         {notes.status === 'draft' ? ' · Draft notes, not reviewed yet' : ' · Reviewed notes'} · checked on {notes.checkedOn}
       </p>
+      <CheatSheet notes={notes} />
       {notes.phases.map((p) => (
         // A Mechanic's id is its deep-link anchor (#slam), so a Phase takes a prefix: Phase and Mechanic ids can be equal.
         <section key={p.id} id={`phase-${p.id}`} className="br-phase">

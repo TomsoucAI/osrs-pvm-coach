@@ -4,3 +4,4 @@
 import './ui/server.test';
 import '../page/src/recentBosses.test';
 import '../page/src/duration.test';
+import '../page/src/wear.test';

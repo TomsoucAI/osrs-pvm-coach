@@ -14,7 +14,7 @@ import {
 import {
   planBankMode, type BankModeRequest, type BoostMode, type CombatStyle, type Slot,
 } from '../core/bankMode';
-import { readBriefing, type BossNotes } from '../core/briefing';
+import { inventoryImage, readBriefing, type BossNotes } from '../core/briefing';
 import { readState, type LiveState } from '../core/liveState';
 import {
   checkProfile, readProfile, viewProfile, writeProfile,
@@ -191,7 +191,8 @@ async function listPage(pageDir: string): Promise<Map<string, string>> {
 export async function startUiServer(options: UiServerOptions): Promise<UiServer> {
   const streams = new Set<ServerResponse>();
   const pageFiles = await listPage(options.pageDir);
-  const icons = createIconCache(options.iconCacheDir, options.fetchIcon ?? fetch);
+  // An item that is not equipment gets its icon when a Boss notes inventory lists it (the Cheat sheet's "Bring").
+  const icons = createIconCache(options.iconCacheDir, options.fetchIcon ?? fetch, (id) => inventoryImage(options.bossNotesDir, id));
   /** Set once the server listens: `http://127.0.0.1:<port>` and `http://localhost:<port>`. */
   let ownOrigins = new Set<string>();
 

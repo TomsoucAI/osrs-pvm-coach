@@ -200,5 +200,76 @@
     { "item": "Crimson kisten", "oneIn": 520, "sources": [{ "ref": "wiki-boss" }] },
     { "item": "Maggot marquess", "oneIn": 3500, "note": "Pet. On the take-eggs option, about 1/1,502.4 per kill.", "sources": [{ "ref": "wiki-boss" }] },
     { "item": "Clue scroll (elite)", "oneIn": 40, "note": "1/38 after the elite Combat Achievement tier.", "sources": [{ "ref": "wiki-boss" }] }
-  ]
+  ],
+  "killers": ["screech", "slam", "larvae"],
+  "inventory": {
+    "ranged": {
+      "note": "The Wiki's ranged setup, with the melee punish switch and the bow for the larvae.",
+      "items": [
+        { "item": "Scythe of Vitur", "id": 22325 },
+        { "item": "Inquisitor's great helm", "id": 24419 },
+        { "item": "Inquisitor's hauberk", "id": 24420 },
+        { "item": "Inquisitor's plateskirt", "id": 24421 },
+        { "item": "Amulet of rancour", "id": 29801 },
+        { "item": "Infernal cape", "id": 21295 },
+        { "item": "Ferocious gloves", "id": 22981 },
+        { "item": "Ultor ring", "id": 28307 },
+        { "item": "Zaryte crossbow", "id": 26374 },
+        { "item": "Webweaver bow", "id": 27655 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Surge potion(4)", "id": 30875 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Book of the Dead", "id": 25818 },
+        { "item": "Sanfew serum(4)", "id": 10925 },
+        { "item": "Sanfew serum(4)", "id": 10925 },
+        { "item": "Sanfew serum(4)", "id": 10925 },
+        { "item": "Divine rune pouch", "id": 27281 },
+        { "item": "Divine super combat potion(4)", "id": 23685 },
+        { "item": "Divine ranging potion(4)", "id": 23733 },
+        { "item": "Drakan's medallion", "id": 22400 }
+      ],
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    "magic": {
+      "note": "The Wiki's magic setup, with the melee punish switch and the bow for the larvae.",
+      "items": [
+        { "item": "Scythe of Vitur", "id": 22325 },
+        { "item": "Inquisitor's great helm", "id": 24419 },
+        { "item": "Inquisitor's hauberk", "id": 24420 },
+        { "item": "Inquisitor's plateskirt", "id": 24421 },
+        { "item": "Amulet of rancour", "id": 29801 },
+        { "item": "Infernal cape", "id": 21295 },
+        { "item": "Ferocious gloves", "id": 22981 },
+        { "item": "Ultor ring", "id": 28307 },
+        { "item": "Eye of Ayak", "id": 31113 },
+        { "item": "Webweaver bow", "id": 27655 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Surge potion(4)", "id": 30875 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Anglerfish", "id": 13441 },
+        { "item": "Sanfew serum(4)", "id": 10925 },
+        { "item": "Sanfew serum(4)", "id": 10925 },
+        { "item": "Sanfew serum(4)", "id": 10925 },
+        { "item": "Sanfew serum(4)", "id": 10925 },
+        { "item": "Rune pouch", "id": 12791 },
+        { "item": "Divine super combat potion(4)", "id": 23685 },
+        { "item": "Saturated heart", "id": 27641 },
+        { "item": "Drakan's medallion", "id": 22400 }
+      ],
+      "sources": [{ "ref": "wiki-strategy" }]
+    }
+  }
 }

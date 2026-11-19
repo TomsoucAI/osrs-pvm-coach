@@ -37,7 +37,11 @@ async function readCapped(reply: Response): Promise<Buffer | null> {
 /** What one wiki request gave: an icon, a definite "no icon", or a failure to try again later. */
 type Download = { icon: Buffer } | 'no-icon' | 'retry';
 
-export function createIconCache(dir: string, fetchIcon: typeof fetch): IconCache {
+/**
+ * `otherImage` names the wiki file of an item that is not equipment (a potion, food), or null. It reads trusted
+ * data only (the Boss notes in the repo), never the request: the request gives an id, never a file name.
+ */
+export function createIconCache(dir: string, fetchIcon: typeof fetch, otherImage: (itemId: number) => Promise<string | null> = async () => null): IconCache {
   // Icons the wiki answered "no" to in this run. A restart asks again. A network error or a 5xx is not kept,
   // so the icon comes back as soon as the network does. Nothing bad is ever written to disk.
   const noIcon = new Set<number>();
@@ -69,8 +73,9 @@ export function createIconCache(dir: string, fetchIcon: typeof fetch): IconCache
 
   return {
     async get(itemId) {
-      const item = findItem(itemId);
-      if (!item?.image) return null;
+      const equipment = findItem(itemId);
+      const item = equipment?.image ? { id: equipment.id, image: equipment.image } : { id: itemId, image: await otherImage(itemId) };
+      if (!item.image) return null;
       const cached = await readFile(join(dir, `${item.id}.png`)).catch(() => null);
       if (cached) return cached;
       if (noIcon.has(item.id)) return null;
