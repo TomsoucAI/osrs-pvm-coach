@@ -36,10 +36,12 @@ input, select {
   background: var(--os-field); color: var(--os-yellow); border: 1px solid var(--os-edge-black); border-radius: 0; padding: 4px var(--space-1); width: 100%;
   box-shadow: inset 1px 1px 0 #000, 1px 1px 0 var(--os-edge-hi);
 }
-.btn {
+/* The game's bevel button, for every button of the tab. */
+.btn, .cycle-btn {
   background: linear-gradient(#5c5245, #3d352a); color: var(--os-orange); border: 1px solid var(--os-edge-black); border-radius: 2px;
-  box-shadow: inset 1px 1px 0 var(--os-edge-hi); padding: 4px 12px; cursor: pointer;
+  box-shadow: inset 1px 1px 0 var(--os-edge-hi); cursor: pointer;
 }
+.btn { padding: 4px 12px; }
 .btn:hover { color: var(--os-white); }
 .btn.on { background: var(--os-well); }
 .segmented { display: flex; gap: 4px; }
@@ -90,10 +92,7 @@ th { color: var(--os-orange); font-weight: 400; }
 
 .slot.pinned { border-style: dashed; }
 .cycle { display: flex; justify-content: space-between; gap: 2px; margin-top: 4px; }
-.cycle-btn {
-  background: linear-gradient(#5c5245, #3d352a); color: var(--os-orange); border: 1px solid var(--os-edge-black); border-radius: 2px;
-  box-shadow: inset 1px 1px 0 var(--os-edge-hi); padding: 0 6px; cursor: pointer; line-height: 1.25;
-}
+.cycle-btn { padding: 0 6px; line-height: 1.25; }
 .cycle-btn:hover:not(:disabled) { color: var(--os-white); }
 .cycle-btn:disabled { opacity: .3; cursor: default; }
 .reset-pins { float: right; padding: 0 6px; }

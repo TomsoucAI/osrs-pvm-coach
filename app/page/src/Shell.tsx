@@ -80,7 +80,7 @@ export function Shell() {
       </header>
       <div className="shell-body">{body}</div>
       <footer className="shell-foot">
-        Game fonts and item icons © Jagex Ltd. Icons from the <a href="https://oldschool.runescape.wiki/" rel="noreferrer" target="_blank">Old School RuneScape Wiki</a>.
+        Game fonts, hitsplat sprites and item icons © Jagex Ltd. Icons and sprites from the <a href="https://oldschool.runescape.wiki/" rel="noreferrer" target="_blank">Old School RuneScape Wiki</a>.
         A fan project, not affiliated with or endorsed by Jagex.
       </footer>
     </div>
