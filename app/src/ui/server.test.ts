@@ -560,6 +560,24 @@ test('with no network, a restarted server still serves the cached icon', async (
   }
 });
 
+test('an item of a Boss notes inventory gets its icon, though it is not equipment (Cheat sheet, ticket #77)', async () => {
+  const ANGLERFISH_URL = 'https://oldschool.runescape.wiki/images/Anglerfish.png';
+  const wiki = fakeWiki({ [ANGLERFISH_URL]: { body: PNG } });
+  const icons = await iconServer(join(dir, 'icons-notes'), wiki.fetchIcon);
+  try {
+    const reply = await sendBytes('/api/icon?id=13441', icons);
+
+    assert.equal(reply.status, 200);
+    assert.deepEqual(reply.body, PNG);
+    assert.deepEqual(wiki.calls.map((c) => c.url), [ANGLERFISH_URL]);
+    // An item in no notes and in no equipment data is still unknown: no wiki request.
+    assert.equal((await sendBytes('/api/icon?id=385', icons)).status, 404, 'a shark is in no Boss notes');
+    assert.equal(wiki.calls.length, 1);
+  } finally {
+    await icons.close();
+  }
+});
+
 test('the state summary gives the worn item ids, for the icons', async () => {
   // An earlier test swaps the fixture's weapon, so compare with the file as it is now.
   const state = JSON.parse(await readFile(join(dir, 'fixture', 'state.json'), 'utf8'));

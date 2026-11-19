@@ -16,7 +16,7 @@ import { MaxHit } from './MaxHit';
 const STYLES: CombatStyle[] = ['melee', 'ranged', 'magic'];
 const SLOTS: Slot[] = ['head', 'cape', 'neck', 'ammo', 'weapon', 'body', 'shield', 'legs', 'hands', 'feet', 'ring'];
 /** The in-game equipment layout, row by row. */
-const DOLL: (Slot | null)[] = [
+export const DOLL: (Slot | null)[] = [
   null, 'head', null,
   'cape', 'neck', 'ammo',
   'weapon', 'body', 'shield',
