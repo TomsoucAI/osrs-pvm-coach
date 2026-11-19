@@ -1,0 +1,204 @@
+{
+  "boss": "Maggot King",
+  "status": "draft",
+  "checkedOn": "2026-11-19",
+  "credit": "Adapted from the Old School RuneScape Wiki (Maggot King and Maggot King/Strategies), CC BY-NC-SA 3.0. Clips: the OSRS Wiki and the named creators.",
+  "sources": {
+    "wiki-strategy": { "name": "OSRS Wiki, Maggot King/Strategies", "url": "https://oldschool.runescape.wiki/w/Maggot_King/Strategies", "date": "2026-11-19" },
+    "wiki-boss": { "name": "OSRS Wiki, Maggot King", "url": "https://oldschool.runescape.wiki/w/Maggot_King", "date": "2026-11-14" },
+    "gnomonkey": { "name": "Gnomonkey, Maggot King budget ironman guide (YouTube)", "url": "https://www.youtube.com/watch?v=0iIPIZTfsBU", "date": "2026-11-18" }
+  },
+  "phases": [
+    {
+      "id": "opening", "name": "Opening", "from": 100, "to": 83,
+      "summary": "It attacks from range with spits, then screeches.",
+      "topMistake": "A protection prayer left on during the screech.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "id": "larvae", "name": "Larvae", "from": 83, "to": 65,
+      "summary": "Each screech now also launches one larva.",
+      "topMistake": "A larva left to land: it eats carrion and heals the boss.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "id": "slams", "name": "Slams", "from": 65, "to": 20,
+      "summary": "Melee slams join after each screech. This is where the kill is won.",
+      "topMistake": "Standing in the slam area and missing the punish hit.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "id": "melee-only", "name": "Melee only", "from": 20, "to": 0,
+      "summary": "It stops retreating and uses melee only. Four larvae come at once near 19% HP.",
+      "topMistake": "Four larvae ignored at 19% HP.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    }
+  ],
+  "mechanics": [
+    {
+      "id": "screech", "name": "Screech", "style": "typeless", "prayer": "off", "from": 100, "to": 20,
+      "tell": "A white aura around the boss, after 4 to 8 spits.",
+      "do": "Turn protection prayers OFF before it lands. Then attack: its Defence is halved.",
+      "miss": "Damage on each tick, up to three times, while a protection prayer is on.",
+      "missDamage": "15–25",
+      "why": "The screech punishes a protection prayer and opens a damage window: its Defence level drops from 200 to 100. A good time for a spec such as the Zaryte crossbow. A late prayer flick still cuts the total.",
+      "clips": [
+        { "kind": "youtube", "videoId": "0iIPIZTfsBU", "start": 228, "end": 258, "label": "Mechanics", "watch": "The prayer goes off as the screech starts.", "credit": "Gnomonkey" }
+      ],
+      "sources": [{ "ref": "wiki-strategy" }, { "ref": "gnomonkey" }]
+    },
+    {
+      "id": "ranged-spit", "name": "Ranged spit", "style": "ranged", "prayer": "missiles", "from": 100, "to": 20,
+      "tell": "A green spit. The fight always opens with ranged.",
+      "do": "Pray Protect from Missiles. Step off the bile it leaves.",
+      "miss": "Poison, and bile on your tile and the two tiles next to it.",
+      "missDamage": "46",
+      "why": "Protect from Missiles blocks all of it. The style flips between ranged and magic after each screech, so count the spits: the screech comes after 4 to 8. A Serpentine helm with anti-venom+ makes you immune to the poison.",
+      "clips": [],
+      "sources": [{ "ref": "wiki-strategy" }, { "ref": "wiki-boss" }]
+    },
+    {
+      "id": "magic-spit", "name": "Magic spit", "style": "magic", "prayer": "magic", "from": 100, "to": 20,
+      "tell": "A yellow spit, after a screech flips the style.",
+      "do": "Pray Protect from Magic. Step off the sticky bile.",
+      "miss": "Sticky bile drains Attack, Strength or Defence and delays your next attack by 1 tick.",
+      "missDamage": "46",
+      "why": "Protect from Magic blocks all of it. An inoculation bracelet makes you immune to the bile. Bile stays until carrion covers it or someone steps on it.",
+      "clips": [],
+      "sources": [{ "ref": "wiki-strategy" }, { "ref": "wiki-boss" }]
+    },
+    {
+      "id": "carrion", "name": "Carrion", "style": "typeless", "from": 100, "to": 20,
+      "tell": "Shadows on random tiles with each screech.",
+      "do": "Stand 2 or more tiles from every shadow, or step onto an isolated shadow the tick after it lands.",
+      "miss": "A direct hit, or the splatter (up to 10).",
+      "missDamage": "10–25",
+      "why": "Carrion also clears bile. A small splatter is acceptable damage. A larva that reaches carrion eats it and heals the boss.",
+      "clips": [],
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "id": "larvae", "name": "Ur-maggot larvae", "style": "typeless", "from": 83, "to": 0,
+      "tell": "From 83% HP, each screech launches one larva: west first, then east and west in turn. Four at once near 19% HP.",
+      "do": "Shoot each larva with a standard bow before it lands. One shot kills it.",
+      "miss": "A landed larva eats carrion and heals the boss. If it reaches you, it chips 3 damage, then 1 more each tick.",
+      "why": "Firing the bow replaces your attack cooldown, so the shot costs no melee hit. With a 3- or 4-tick bow, two Dharok's attacks still fit before the first slam.",
+      "clips": [
+        { "kind": "youtube", "videoId": "0iIPIZTfsBU", "start": 351, "end": 381, "label": "In a kill", "watch": "The bow comes out, one shot, back to melee.", "credit": "Gnomonkey" }
+      ],
+      "sources": [{ "ref": "wiki-strategy" }, { "ref": "gnomonkey" }]
+    },
+    {
+      "id": "slam", "name": "Slam", "style": "melee", "prayer": "melee", "from": 65, "to": 0,
+      "tell": "After a screech, it walks to the bone wall, lines up with your tile and slams a 3×4 area.",
+      "do": "Step to its east or west edge. Click the boss on the tick it extends its head.",
+      "miss": "You take the slam (35 with Protect from Melee) and lose the punish hit.",
+      "missDamage": "55",
+      "why": "A punish hit has no attack delay, +50% damage and better accuracy, most with crush. Only the first hit of a multi-hit weapon gets the bonus. The slam also throws 3 biles within 2 tiles.",
+      "clips": [
+        { "kind": "wiki", "file": "Maggot_King_-_4-tick_melee_punish.webm", "label": "4-tick weapon", "watch": "Step back, then one hit lands with the slam.", "credit": "OSRS Wiki" },
+        { "kind": "wiki", "file": "Maggot_King_-_5-tick_melee_punish.webm", "label": "5-tick weapon", "watch": "The 5-tick attack fits beside the punish: no lost ticks.", "credit": "OSRS Wiki" },
+        { "kind": "wiki", "file": "Maggot_King_-_melee_punish_weapon_switch.webm", "label": "Weapon switch", "watch": "The switch happens before the step back.", "credit": "OSRS Wiki" }
+      ],
+      "sources": [{ "ref": "wiki-strategy" }, { "ref": "wiki-boss" }]
+    },
+    {
+      "id": "dharok", "name": "Dharok's punish cycles", "style": "melee", "prayer": "melee", "from": 65, "to": 0,
+      "tell": "The same slam, fought with Dharok's greataxe at low HP.",
+      "do": "Use one 7-tick cycle: drag, drag, step back. Keep your HP at 1 to 15 during melee.",
+      "miss": "You lose punish hits. With HP high enough to survive a slam, Dharok's is worse than the other methods.",
+      "why": "An advanced method for the fastest kills. Keep HP at 20 to 30 outside melee, with low-heal food such as Guthix rest. The Wiki clips show three orders of the same cycle.",
+      "clips": [
+        { "kind": "wiki", "file": "Maggot_king_drag-drag-stepback.webm", "label": "Drag-drag-step", "watch": "Two drags, then the step back.", "credit": "OSRS Wiki" },
+        { "kind": "wiki", "file": "Maggot_king_drag-stepback-drag.webm", "label": "Drag-step-drag", "watch": "The step back sits in the middle.", "credit": "OSRS Wiki" },
+        { "kind": "wiki", "file": "Maggot_king_dh_stepback-drag-drag.webm", "label": "Step-drag-drag", "watch": "The step back comes first.", "credit": "OSRS Wiki" }
+      ],
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "id": "melee-only", "name": "Melee only", "style": "melee", "prayer": "melee", "from": 20, "to": 0,
+      "tell": "At about 305 HP (20%), it stops retreating and uses melee only.",
+      "do": "Keep Protect from Melee on. Ignore the screech: nothing is left to pray against.",
+      "miss": "Slams still hit hard.",
+      "missDamage": "55",
+      "why": "The spits stop here, so the screech no longer punishes a prayer. Keep punishing slams to the end.",
+      "clips": [],
+      "sources": [{ "ref": "wiki-strategy" }]
+    }
+  ],
+  "styles": {
+    "attacks": ["ranged", "magic", "melee"],
+    "weakness": "Crush (stab +172, slash +100, crush +45) and heavy ranged (heavy +43). Fire spells: elemental weakness to fire.",
+    "detail": "1,500 HP, Defence 200. Ranged and magic spits hit up to 46; the melee slam up to about 55. Fire spells add a stacking 5 burn damage and lower its magic defence by 20 per stack. During slams its magic defence goes up from +150 to +400. Immune to poison and venom; not immune to thralls.",
+    "sources": [{ "ref": "wiki-boss" }, { "ref": "wiki-strategy" }]
+  },
+  "methods": [
+    {
+      "rank": 1, "name": "Magic, then melee punishes",
+      "summary": "A harmonised Nightmare staff casting fire surge with a tome of fire, ahead of Tumeken's shadow. Twinflame staff is also good. Melee punishes from 65%. To confirm: the Wiki gives no rank; this order is a draft.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "rank": 2, "name": "Heavy ranged, then melee punishes",
+      "summary": "Ascension crossbows come second only to the harmonised Nightmare staff, but need the right dodge timing. Cheaper than magic.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "rank": 3, "name": "Budget heavy ranged",
+      "summary": "The hunters' sunlight crossbow is the budget pick and beats the twisted bow here. Other crossbows give longer kills.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "rank": 4, "name": "Dharok's punish",
+      "summary": "For skilled players chasing the fastest kills: a 7-tick drag-drag-stepback cycle at low HP. Worse than the others if you keep HP high enough to survive a slam.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    }
+  ],
+  "gearPrinciples": [
+    {
+      "principle": "Punish with a slow, hard-hitting crush weapon.",
+      "why": "Crush gets a large accuracy boost on punishes, and a punish has no attack delay. Examples: Obligator, Dharok's greataxe, Elder maul, a godsword.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "principle": "Bring a standard-ammo bow for the larvae.",
+      "why": "One standard arrow kills a larva. Webweaver, Craw's or Venator bow, then Bow of Faerdhinen, composite or crystal bow. A charged bow avoids a quiver or cape switch problem.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "principle": "Use damage specs, not Defence-reducing specs.",
+      "why": "Its Defence level comes back after each screech. If you do use a Defence-reducing spec, land it on a punish.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    },
+    {
+      "principle": "Rigour is highly recommended.",
+      "why": "It needs 74 Prayer and 70 Defence. An amulet of blood fury is an optional switch.",
+      "sources": [{ "ref": "wiki-strategy" }]
+    }
+  ],
+  "combatAchievements": [
+    { "name": "Maggot Squasher", "tier": "hard", "task": "Kill the Maggot King once.", "tip": "Learn the screech first: prayer off, then attack.", "sources": [{ "ref": "wiki-boss" }] },
+    { "name": "Trying to fit in", "tier": "elite", "task": "Kill it using only weapons found in Vampyrium.", "tip": "To confirm: which weapons count.", "sources": [{ "ref": "wiki-boss" }] },
+    { "name": "Maggot Exterminator", "tier": "elite", "task": "Kill it 25 times.", "tip": "Comes with the grind for the uniques.", "sources": [{ "ref": "wiki-boss" }] },
+    { "name": "King-sized clobbering", "tier": "master", "task": "Kill it without missing a melee punish.", "tip": "Click on the tick it extends its head, every slam.", "sources": [{ "ref": "wiki-boss" }, { "ref": "wiki-strategy" }] },
+    { "name": "Cordoned Off", "tier": "master", "task": "Kill it without moving past the back row of tiles.", "tip": "To confirm: a method that stays on the back row.", "sources": [{ "ref": "wiki-boss" }] },
+    { "name": "Digging in", "tier": "master", "task": "Kill it while moving 40 tiles or fewer.", "tip": "To confirm: a method that keeps the steps low.", "sources": [{ "ref": "wiki-boss" }] },
+    { "name": "Camping the King", "tier": "master", "task": "Kill it 12 times without leaving the arena.", "tip": "To confirm: a supply setup for 12 kills.", "sources": [{ "ref": "wiki-boss" }] },
+    { "name": "Perfect Maggot King", "tier": "master", "task": "Kill it with no avoidable damage taken and with no heal on the boss.", "tip": "Every larva shot before it lands; prayer off on every screech; no carrion hit.", "sources": [{ "ref": "wiki-boss" }, { "ref": "wiki-strategy" }] },
+    { "name": "Maggot King Speed Chaser", "tier": "grandmaster", "task": "Get your first 5 kills within 9 minutes of entering the arena.", "tip": "To confirm: the method that fits the time.", "sources": [{ "ref": "wiki-boss" }] }
+  ],
+  "mistakes": [
+    { "mistake": "A protection prayer left on during the screech.", "fix": "Watch for the white aura and turn the prayer off before it lands.", "sources": [{ "ref": "wiki-strategy" }] },
+    { "mistake": "The bow does not fire after a melee cape switch.", "fix": "Switch back to the quiver, or use a charged bow.", "sources": [{ "ref": "wiki-strategy" }] },
+    { "mistake": "The Venator bow's short range pulls you into a hazard.", "fix": "Use it only when several larvae spawn.", "sources": [{ "ref": "wiki-strategy" }] },
+    { "mistake": "With an ascension crossbow, an attack delayed on each spit.", "fix": "Learn the dodge timing, or use another method.", "sources": [{ "ref": "wiki-strategy" }] },
+    { "mistake": "With Dharok's, HP kept high enough to survive a slam.", "fix": "Keep HP at 1 to 15 during melee, or use another method.", "sources": [{ "ref": "wiki-strategy" }] },
+    { "mistake": "The 4-tick step-back tile has bile on it.", "fix": "Check the tile before the slam.", "sources": [{ "ref": "wiki-strategy" }] }
+  ],
+  "drops": [
+    { "item": "Elder venator fang", "oneIn": 340, "sources": [{ "ref": "wiki-boss" }] },
+    { "item": "Crimson kisten", "oneIn": 520, "sources": [{ "ref": "wiki-boss" }] },
+    { "item": "Maggot marquess", "oneIn": 3500, "note": "Pet. On the take-eggs option, about 1/1,502.4 per kill.", "sources": [{ "ref": "wiki-boss" }] },
+    { "item": "Clue scroll (elite)", "oneIn": 40, "note": "1/38 after the elite Combat Achievement tier.", "sources": [{ "ref": "wiki-boss" }] }
+  ]
+}

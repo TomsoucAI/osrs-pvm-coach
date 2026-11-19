@@ -1,5 +1,6 @@
-// The page's only data path: three read-only endpoints of the UI server, and its "changed" event stream.
+// The page's only data path: four read-only endpoints of the UI server, and its "changed" event stream.
 import type { BankModePlan, BoostMode, CombatStyle, Slot } from '../../src/core/bankMode';
+import type { BossNotes } from '../../src/core/briefing';
 import type { StateSummary } from '../../src/ui/server';
 
 export type { BankModePlan, BoostMode, CombatStyle, Slot, StateSummary };
@@ -48,6 +49,23 @@ export async function fetchBankMode(view: View, controls: Controls): Promise<{ s
     }),
   ]);
   return { summary, plan };
+}
+
+export type { AttackStyle, BossNotes, Mechanic, Phase, Prayer } from '../../src/core/briefing';
+
+/** A boss's Briefing: its notes, "no notes" (404), or an error (a malformed file, no server). */
+export type BriefingReply = { kind: 'notes'; notes: BossNotes } | { kind: 'none' } | { kind: 'error'; message: string };
+
+export async function fetchBriefing(boss: string): Promise<BriefingReply> {
+  try {
+    const response = await fetch(`/api/briefing?${new URLSearchParams({ boss })}`);
+    if (response.ok) return { kind: 'notes', notes: await response.json() as BossNotes };
+    if (response.status === 404) return { kind: 'none' };
+    const { error } = await response.json() as { error?: string };
+    return { kind: 'error', message: error ?? `The server answered ${response.status}.` };
+  } catch {
+    return { kind: 'error', message: 'The UI server does not answer.' };
+  }
 }
 
 /** Calls `onChanged` when the state or bank file changed, and `onConnection` when the stream opens or drops. */

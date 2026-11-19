@@ -1,0 +1,75 @@
+/* The Briefing tab (ticket #76): prototype variant D's main column. Spacing, type and colours come from tokens.css.
+   Colour jobs: white body, tan labels, orange headings, yellow the name. Red only inside hitsplats and on melee.
+   Type scale: 16px body, 20px Do, 24px Mechanic name, 32px Phase heading. */
+.br-scroll {
+  display: grid; gap: var(--space-4); max-width: 960px; padding: var(--space-2);
+  font-family: var(--font-plain); font-size: var(--text-body); line-height: 1.5; color: var(--os-white); text-shadow: var(--os-text-shadow);
+}
+.br-scroll p { margin: 0; }
+.br-scroll a { color: inherit; }
+.br-inset {
+  padding: var(--space-2); background: var(--os-inset);
+  border: 1px solid var(--os-edge-lo); box-shadow: inset 1px 1px 0 var(--os-edge-black), 1px 1px 0 var(--os-edge-hi);
+}
+
+/* The trust line, at the top: draft or reviewed, and the "checked on" date. */
+.br-status { color: var(--os-tan); }
+.br-status b { color: var(--os-yellow); font-family: var(--font-bold); font-weight: 400; }
+.br-status.draft { box-shadow: inset 0 0 0 1px var(--os-orange); }
+
+/* A Phase: the top level of the scroll, the only 32px text in it. */
+.br-phase { display: grid; gap: var(--space-2); }
+.br-phase-head {
+  padding-bottom: var(--space-1); border-bottom: 2px solid var(--os-edge-black); box-shadow: 0 1px 0 var(--os-edge-hi);
+}
+.br-phase-head h2 {
+  margin: 0; font-family: var(--font-bold); font-weight: 400; font-size: var(--text-phase); line-height: 1; color: var(--os-orange);
+}
+.br-phase-hp { margin-right: var(--space-2); }
+.br-phase-sum { color: var(--os-white); }
+.br-mistake b { color: var(--os-tan); font-weight: 400; }
+
+/* A Mechanic: name, style tag and prayer badge, then the four rows. */
+.br-mechanic { display: grid; gap: var(--space-2); scroll-margin-top: var(--space-4); }
+.br-mechanic-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.br-mechanic-head h3 {
+  margin: 0; font-family: var(--font-bold); font-weight: 400; font-size: var(--text-mechanic); line-height: 1.25; color: var(--os-yellow);
+}
+
+/* Style and prayer tags. HARD RULE: melee red, ranged green, magic blue, on every tag. */
+.br-tag { display: inline-flex; align-items: center; gap: var(--space-1); white-space: nowrap; color: var(--os-tan); }
+.br-melee { color: var(--os-melee); }
+.br-ranged { color: var(--os-ranged); }
+.br-magic { color: var(--os-magic); }
+.br-typeless { color: var(--os-tan); }
+/* "Prayer OFF" is as clear as a prayer: white bold, the shield struck through. */
+.br-prayer-off { color: var(--os-white); font-family: var(--font-bold); }
+.br-struck { position: relative; display: inline-flex; color: var(--os-tan); }
+.br-struck::after {
+  content: ''; position: absolute; left: -2px; right: -2px; top: 7px; height: 2px; background: var(--os-white); transform: rotate(-40deg);
+}
+
+/* Tell / Do / Miss / Why as table rows: one label column, a thin rule between rows. Why is always open. */
+.br-table { margin: 0; border: 1px solid var(--os-edge-lo); background: var(--os-bg); }
+.br-line { display: grid; grid-template-columns: 56px 1fr; gap: var(--space-2); align-items: center; padding: var(--space-1) var(--space-2); }
+.br-line + .br-line { border-top: 1px solid var(--os-stone); }
+.br-line dt { color: var(--os-tan); }
+.br-line dd { margin: 0; }
+.br-do dd { font-family: var(--font-bold); font-size: var(--text-do); line-height: 1.4; color: var(--os-white); }
+
+/* The game's hitsplat, drawn in CSS: a red splat with a white number. A range is two splats. */
+.br-splats { display: inline-flex; align-items: center; vertical-align: middle; margin-right: var(--space-1); }
+.br-splat {
+  display: inline-grid; place-items: center; min-width: 48px; height: 40px; padding: 0 var(--space-1); box-sizing: border-box;
+  background: #c8160b; color: var(--os-white); text-shadow: var(--os-text-shadow); font-family: var(--font-bold);
+  clip-path: polygon(50% 0, 62% 14%, 80% 6%, 82% 26%, 100% 30%, 90% 50%, 100% 70%, 82% 74%, 80% 94%, 62% 86%, 50% 100%, 38% 86%, 20% 94%, 18% 74%, 0 70%, 10% 50%, 0 30%, 18% 26%, 20% 6%, 38% 14%);
+}
+.br-splat + .br-splat { margin-left: -4px; }
+
+/* A gap in the draft: a yellow outline, never a colour fill. */
+.br-confirm {
+  display: inline-block; margin-right: var(--space-1); padding: 0 var(--space-1);
+  color: var(--os-yellow); box-shadow: inset 0 0 0 1px var(--os-yellow);
+}
+
+.br-sources, .br-credit { color: var(--os-credit); text-shadow: none; }

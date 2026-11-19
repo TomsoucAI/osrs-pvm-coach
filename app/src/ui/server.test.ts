@@ -12,6 +12,8 @@ import { readState } from '../core/liveState';
 import { startUiServer, type UiServer } from './server';
 
 const PAGE_HTML = '<!doctype html><title>Bank mode</title>';
+/** The repo's Boss notes folder: the server tests read the real notes. */
+const NOTES = resolve('..', 'boss-notes');
 let dir: string;
 let server: UiServer;
 let loggedOut: UiServer;
@@ -25,10 +27,10 @@ before(async () => {
   const page = join(dir, 'page');
   await cp(join(dir, 'index.html'), join(page, 'index.html'));
   server = await startUiServer({
-    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'),
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
   });
   loggedOut = await startUiServer({
-    port: 0, stateFile: join(dir, 'logged-out', 'state.json'), bankFile: join(dir, 'logged-out', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'),
+    port: 0, stateFile: join(dir, 'logged-out', 'state.json'), bankFile: join(dir, 'logged-out', 'bank.json'), pageDir: page, iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
   });
 });
 
@@ -201,7 +203,7 @@ test('a change to the bank file pushes a "changed" event', async () => {
 test('with no plugin folder yet, the server starts, answers 503, and pushes once the plugin writes its files', async () => {
   const folder = join(dir, 'not-yet');
   const early = await startUiServer({
-    port: 0, stateFile: join(folder, 'state.json'), bankFile: join(folder, 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'),
+    port: 0, stateFile: join(folder, 'state.json'), bankFile: join(folder, 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
   });
   try {
     const reply = await send('/api/state', { on: early });
@@ -280,7 +282,7 @@ test('static files come from the page folder only', async () => {
 
 test('the built page serves the RuneScape fonts from its own folder, with a font content type', async () => {
   const built = await startUiServer({
-    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: resolve('dist', 'page'), iconCacheDir: join(dir, 'icons'),
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: resolve('dist', 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
   });
   try {
     for (const font of ['RuneScape-Plain-12.ttf', 'RuneScape-Bold-12.ttf']) {
@@ -329,6 +331,81 @@ test('an error reply has no stack trace and no file path', async () => {
   }
 });
 
+// The Briefing (ticket #76): the Boss notes, drawn by the page with no AI.
+const BRIEFING = '/api/briefing?boss=Maggot%20King';
+
+test('the Briefing endpoint returns Maggot King\'s Phases and Mechanics', async () => {
+  const reply = await send(BRIEFING);
+
+  assert.equal(reply.status, 200, reply.body);
+  const notes = JSON.parse(reply.body);
+  assert.equal(notes.boss, 'Maggot King');
+  assert.equal(notes.status, 'draft');
+  assert.deepEqual(notes.phases.map((p: { name: string }) => p.name), ['Opening', 'Larvae', 'Slams', 'Melee only']);
+  const slam = notes.mechanics.find((m: { id: string }) => m.id === 'slam');
+  assert.equal(slam.missDamage, '55');
+  assert.deepEqual(Object.keys(slam).filter((k) => ['tell', 'do', 'miss', 'why'].includes(k)), ['tell', 'do', 'miss', 'why']);
+  const screech = notes.mechanics.find((m: { id: string }) => m.id === 'screech');
+  assert.equal(screech.missDamage, '15–25');
+  assert.equal(screech.prayer, 'off');
+});
+
+test('an unknown boss answers "no notes"', async () => {
+  const reply = await send('/api/briefing?boss=Abyssal%20demon');
+
+  assert.equal(reply.status, 404);
+  assert.match(JSON.parse(reply.body).error, /no Boss notes/i);
+});
+
+test('the Briefing endpoint needs a boss', async () => {
+  assert.equal((await send('/api/briefing')).status, 400);
+});
+
+test('a malformed Boss notes file is refused: an error, never the notes', async () => {
+  const notesDir = join(dir, 'bad-notes');
+  await cp(NOTES, notesDir, { recursive: true });
+  await writeFile(join(notesDir, 'broken-boss.json'), JSON.stringify({ boss: 'Broken Boss', status: 'draft' }));
+  const bad = await startUiServer({
+    port: 0, stateFile: join(dir, 'fixture', 'state.json'), bankFile: join(dir, 'fixture', 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: notesDir,
+  });
+  try {
+    const reply = await send('/api/briefing?boss=Broken%20Boss', { on: bad });
+    assert.equal(reply.status, 500);
+    assert.equal(typeof JSON.parse(reply.body).error, 'string');
+    assert.ok(!/\bat \w|[A-Z]:\\|\.json/.test(reply.body), reply.body);
+    // The other bosses' notes still load.
+    assert.equal((await send(BRIEFING, { on: bad })).status, 200);
+  } finally {
+    await bad.close();
+  }
+});
+
+test('the Briefing answer is identical with and without a target in the state file (legality condition)', async () => {
+  const inFight = join(dir, 'in-fight');
+  await cp(join(dir, 'fixture'), inFight, { recursive: true });
+  const state = JSON.parse(await readFile(join(inFight, 'state.json'), 'utf8'));
+  await writeFile(join(inFight, 'state.json'), JSON.stringify({ ...state, target: { id: 15742, name: 'Maggot King' } }));
+  const fighting = await startUiServer({
+    port: 0, stateFile: join(inFight, 'state.json'), bankFile: join(inFight, 'bank.json'), pageDir: join(dir, 'page'), iconCacheDir: join(dir, 'icons'), bossNotesDir: NOTES,
+  });
+  try {
+    const calm = await send(BRIEFING);
+    const fight = await send(BRIEFING, { on: fighting });
+    const away = await send(BRIEFING, { on: loggedOut });
+
+    assert.equal(calm.status, 200);
+    assert.equal(fight.body, calm.body);
+    assert.equal(away.body, calm.body);
+  } finally {
+    await fighting.close();
+  }
+});
+
+test('the Briefing endpoint accepts only GET and HEAD, and is never cached', async () => {
+  assert.equal((await send(BRIEFING, { method: 'POST' })).status, 405);
+  assert.equal((await send(BRIEFING)).headers['cache-control'], 'no-store');
+});
+
 // Item icons (ticket #10): the wiki fetch is the external boundary, so a fake replaces it.
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('fake icon')]);
 const WHIP = 4151;
@@ -357,6 +434,7 @@ async function iconServer(cacheDir: string, fetchIcon: typeof fetch) {
     bankFile: join(dir, 'fixture', 'bank.json'),
     pageDir: join(dir, 'page'),
     iconCacheDir: cacheDir,
+    bossNotesDir: NOTES,
     fetchIcon,
   });
 }
